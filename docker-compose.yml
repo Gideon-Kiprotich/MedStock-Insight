@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: medstock-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: medstock
+      POSTGRES_USER: medstock
+      POSTGRES_PASSWORD: medstock
+    ports:
+      - "5432:5432"
+    volumes:
+      - medstock_pgdata:/var/lib/postgresql/data
+
+volumes:
+  medstock_pgdata:
