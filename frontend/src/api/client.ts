@@ -1,3 +1,4 @@
+import type { ScenarioParameters, ScenarioResult, AggregateEvaluation, DecisionAnalytics } from '../types/analytics';
 import type {
   AuditLog,
   CollectionResponse,
@@ -98,6 +99,11 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 }
 
 export const api = {
+  simulateScenario: (params: ScenarioParameters) => request<ScenarioResult>('/scenarios', {method: 'POST', body: JSON.stringify(params)}),
+  replayScenario: (id: string) => request<ScenarioResult>(`/scenarios/${id}`),
+  getDecisionAnalytics: () => request<DecisionAnalytics>('/decision-analytics'),
+  getAggregateEvaluation: () => request<AggregateEvaluation | null>('/forecast-evaluation/aggregate'),
+  runAggregateEvaluation: () => request<AggregateEvaluation>('/forecast-evaluation/experiments', {method: 'POST', body: '{}'}),
   // Auth
   login: async (credentials: { email?: string; username?: string; password?: string }) => {
     const email = credentials.email || credentials.username || '';

@@ -35,7 +35,10 @@ def main():
             InventoryTransaction.transaction_type == InventoryTransactionType.CONSUMPTION,
             InventoryTransaction.reference_number.like("SYN-KENYA-%"))) or 0
         stockouts = db.scalar(select(func.count()).select_from(InventoryTransaction).where(
-            InventoryTransaction.reference_number.like("SYN-KENYA-STOCKOUT-%"))) or 0
+            (InventoryTransaction.reference_number.like("SYN-KENYA-STOCKOUT-%") |
+             (InventoryTransaction.reference_number.like("SYN-KENYA-ADJUSTMENT_OUT-%") &
+              (InventoryTransaction.reference_number.like("%-150") |
+               InventoryTransaction.reference_number.like("%-515")))))) or 0
         series = db.scalar(select(func.count()).select_from(FacilityMedicinePolicy).join(
             Facility, FacilityMedicinePolicy.facility_id == Facility.id).where(Facility.source_type == "KMHFR")) or 0
         print("# Kenya/Nairobi data quality report")

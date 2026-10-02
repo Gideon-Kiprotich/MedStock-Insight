@@ -47,7 +47,7 @@ def forecast_evaluation(
     offset: int = Query(default=0, ge=0),
 ):
     end = end_date or date.today()
-    start = start_date or end - timedelta(days=89)
+    start = start_date or end - timedelta(days=729)
     if end < start or (end - start).days > 730:
         raise HTTPException(status_code=422, detail="Evaluation date range must be 1–731 days")
     filters = [InventoryTransaction.transaction_type == InventoryTransactionType.CONSUMPTION,

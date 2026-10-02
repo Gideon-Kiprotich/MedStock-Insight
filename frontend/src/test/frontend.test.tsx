@@ -27,6 +27,7 @@ vi.mock('../api/client', async () => {
       getForecastRuns: vi.fn(),
       getForecastSummary: vi.fn(),
       getForecastEvaluation: vi.fn(),
+      getAggregateEvaluation: vi.fn().mockResolvedValue(null),
       getForecastExplanation: vi.fn(),
       getRiskExplanation: vi.fn(),
       getRecommendationExplanation: vi.fn(),

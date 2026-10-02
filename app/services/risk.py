@@ -126,7 +126,8 @@ def _get_forecast_run(
 
 
 def generate_risk_assessment(
-    db: Session, facility_id: UUID, medicine_id: UUID, forecast_run_id: UUID | None = None
+    db: Session, facility_id: UUID, medicine_id: UUID, forecast_run_id: UUID | None = None,
+    assessment_date: date | None = None,
 ) -> RiskAssessment:
     facility = db.scalar(select(Facility).where(Facility.id == facility_id, Facility.is_active.is_(True)))
     medicine = db.scalar(select(Medicine).where(Medicine.id == medicine_id, Medicine.is_active.is_(True)))
@@ -181,7 +182,7 @@ def generate_risk_assessment(
     ]
 
     calculation = calculate_risk(
-        assessment_date=date.today(),
+        assessment_date=assessment_date or date.today(),
         inventory_on_hand=inventory_on_hand,
         safety_stock=Decimal(policy.safety_stock),
         forecast_points=[(point.target_date, Decimal(point.predicted_demand)) for point in points],

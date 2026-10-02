@@ -1,6 +1,6 @@
 # Phase 9 demonstration scenarios
 
-The seed is a **synthetic simulation**, not a record of inventory or transfers at the named facilities. Run it only on a disposable database after migrations. It uses seed 20260930, a 365-day relative calendar, facility/medicine-specific SHA-256 random streams, deterministic seasonality, and ledger-backed opening stock, receipts, consumption and adjustments. Re-running the seed does not overwrite existing inventory. To reset, create a fresh demo database. Dates shift with the day of seeding.
+The seed is a **synthetic simulation**, not a record of inventory or transfers at the named facilities. Run it only on a disposable database after migrations. It uses seed 20260930, a 730-day relative calendar (expanded in Phase 10), facility/medicine-specific SHA-256 random streams, deterministic seasonality, and ledger-backed opening stock, receipts, consumption and adjustments. Re-running the seed does not overwrite existing inventory. To reset, create a fresh demo database. Dates shift with the day of seeding.
 
 | Identifier | Facility / medicine | Expected condition |
 | --- | --- | --- |

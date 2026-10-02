@@ -26,6 +26,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }) => 
     { id: 'inventory', label: 'Inventory Balances', icon: Package },
     { id: 'medicines', label: 'Medicine Catalog', icon: Pill },
     { id: 'forecasts', label: 'Demand Forecasts', icon: TrendingUp },
+    { id: 'scenario', label: 'Scenario Analysis', icon: Activity },
     { id: 'risk', label: 'Stockout Risk', icon: AlertTriangle },
     { id: 'redistribution', label: 'Redistribution Queue', icon: ArrowRightLeft },
     { id: 'transfers', label: 'Transfer Tracking', icon: Truck },
@@ -35,7 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }) => 
 
   const secondaryNav = [
     { id: 'consumption', label: 'Consumption Log', icon: Activity },
-    { id: 'reports', label: 'Operational Reports', icon: FileBarChart },
+    { id: 'reports', label: 'Decision Analytics', icon: FileBarChart },
     { id: 'users', label: 'User Management', icon: Users },
     { id: 'settings', label: 'System Settings', icon: Settings },
   ];

@@ -1,3 +1,4 @@
+import { AggregateEvaluationPanel } from '../components/common/AggregateEvaluationPanel';
 import { medicineLabel } from '../utils/labels';
 import React, { useEffect, useState } from 'react';
 import { api } from '../api/client';
@@ -431,6 +432,7 @@ export const ForecastsPage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    <AggregateEvaluationPanel />
+      </div>
   );
 };

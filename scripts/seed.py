@@ -5,6 +5,7 @@ records. For a fresh simulation use a disposable empty database, not production 
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import math
@@ -41,7 +42,7 @@ from app.models.core import (
 
 REFERENCE = json.loads((Path(__file__).resolve().parents[1] / "data" / "kenya_reference.json").read_text())
 SEED = 20260930
-DAYS = 365
+DAYS = 730
 PREFIX = "SYN-KENYA-"
 
 ROLE_DEFS = {
@@ -75,6 +76,32 @@ MODEL_DEFS = [
 def _rng(*parts: str) -> random.Random:
     digest = hashlib.sha256((str(SEED) + ":" + ":".join(parts)).encode()).digest()
     return random.Random(int.from_bytes(digest[:8], "big"))
+
+
+def synthetic_history(facility_code: str, medicine_code: str, base: int, as_of: date):
+    """Deterministic ledger events; UUIDs and timestamps are intentionally not fixed."""
+    rng = _rng(facility_code, medicine_code)
+    balance = Decimal(base * 25)
+    start = as_of - timedelta(days=DAYS-1)
+    interruptions = {*range(150,155), *range(515,522)}
+    for offset in range(DAYS):
+        day = start + timedelta(days=offset)
+        if offset in (150,515):
+            if balance > 0:
+                yield InventoryTransactionType.ADJUSTMENT_OUT, balance, day, offset
+            balance = Decimal(0)
+        if offset not in interruptions and (offset % (19+rng.randrange(5)) == 0 or balance < base*6):
+            receipt = Decimal(base*rng.randint(16,30))
+            balance += receipt
+            yield InventoryTransactionType.RECEIPT, receipt, day, offset
+        weekday = [1.04,1.12,1.10,1.06,1.00,.80,.72][day.weekday()]
+        seasonal = 1+.12*math.sin(2*math.pi*day.timetuple().tm_yday/365)
+        trend = 1+.08*offset/DAYS
+        event = 2.2 if offset % 97 in (42,43) else (.45 if offset % 83 == 20 else 1)
+        demand = max(0,round(base*weekday*seasonal*trend*event*rng.uniform(.72,1.28)))
+        used = Decimal(min(demand,int(balance)))
+        balance -= used
+        yield InventoryTransactionType.CONSUMPTION, used, day, offset
 
 
 def _upsert(db, model, key: str, value: str, attrs: dict):
@@ -149,11 +176,11 @@ def _tx(facility, medicine, kind, quantity, day, suffix, user_id):
             "created_by": user_id}
 
 
-def seed_operations(db, facilities, medicines, admin):
+def seed_operations(db, facilities, medicines, admin, as_of=None):
     exists = db.scalar(select(InventoryTransaction.id).where(InventoryTransaction.reference_number.like(PREFIX + "%")).limit(1))
     if exists:
         return False
-    today = date.today()
+    today = as_of or date.today()
     start = today - timedelta(days=DAYS - 1)
     tx_rows = []
     balances = {}
@@ -165,7 +192,6 @@ def seed_operations(db, facilities, medicines, admin):
             if not applicable(facility_code, medicine):
                 continue
             series.append((facility_code, medicine.code))
-            rng = _rng(facility_code, medicine.code)
             category_factor = {"Maternal and newborn": 0.8, "Mental health": 0.7,
                                "Emergency": 0.45, "Dermatological": 0.6}.get(medicine.category, 1.0)
             base = max(2, round((3 + medicine.level_of_use % 4) * intensity * category_factor * SPECIALITY_BOOST.get((facility_code, medicine.category), 1)))
@@ -181,28 +207,10 @@ def seed_operations(db, facilities, medicines, admin):
             balance = Decimal(base * 25)
             tx_rows.append(_tx(facility, medicine, InventoryTransactionType.RECEIPT, balance, start,
                                f"OPEN-{facility_code}-{medicine.code}", admin.id))
-            for offset in range(DAYS):
-                day = start + timedelta(days=offset)
-                # One deliberately simulated stockout interval per series. No real event implied.
-                if offset == 150:
-                    if balance > 0:
-                        tx_rows.append(_tx(facility, medicine, InventoryTransactionType.ADJUSTMENT_OUT,
-                                           balance, day, f"STOCKOUT-{facility_code}-{medicine.code}", admin.id))
-                    balance = Decimal(0)
-                if offset not in range(150, 155) and (offset % (19 + rng.randrange(5)) == 0 or balance < base * 6):
-                    receipt = Decimal(base * rng.randint(16, 30))
-                    tx_rows.append(_tx(facility, medicine, InventoryTransactionType.RECEIPT, receipt, day,
-                                       f"RCPT-{facility_code}-{medicine.code}-{offset:03d}", admin.id))
-                    balance += receipt
-                weekday = [1.04, 1.12, 1.10, 1.06, 1.00, 0.80, 0.72][day.weekday()]
-                seasonal = 1 + 0.12 * math.sin(2 * math.pi * day.timetuple().tm_yday / 365)
-                trend = 1 + 0.08 * offset / DAYS
-                event = 2.2 if offset % 97 in (42, 43) else (0.45 if offset % 83 == 20 else 1.0)
-                demand = max(0, round(base * weekday * seasonal * trend * event * rng.uniform(0.72, 1.28)))
-                used = Decimal(min(demand, int(balance)))
-                tx_rows.append(_tx(facility, medicine, InventoryTransactionType.CONSUMPTION, used, day,
-                                   f"CONS-{facility_code}-{medicine.code}-{offset:03d}", admin.id))
-                balance -= used
+            for kind, quantity, day, offset in synthetic_history(facility_code, medicine.code, base, today):
+                tx_rows.append(_tx(facility, medicine, kind, quantity, day,
+                    f"{kind.value}-{facility_code}-{medicine.code}-{offset:03d}", admin.id))
+                balance += quantity if kind == InventoryTransactionType.RECEIPT else -quantity
             balances[(facility_code, medicine.code)] = balance
     # Deliberate current-state scenarios, all represented by ledger adjustments.
     by_name = {(m.generic_name, m.strength, m.dosage_form): m for m in medicines.values()}
@@ -253,19 +261,20 @@ def seed_operations(db, facilities, medicines, admin):
     return True
 
 
-def seed_batches_procurement(db, facilities, medicines, admin):
+def seed_batches_procurement(db, facilities, medicines, admin, as_of=None):
+    today = as_of or date.today()
     medicine = next(m for m in medicines.values() if m.generic_name == "Paracetamol" and m.strength == "500 mg")
     facility = facilities["13023"]
     if not db.scalar(select(Batch.id).where(Batch.batch_number == PREFIX + "BATCH-001")):
         db.add(Batch(facility_id=facility.id, medicine_id=medicine.id,
-                     batch_number=PREFIX + "BATCH-001", expiry_date=date.today() + timedelta(days=540),
+                     batch_number=PREFIX + "BATCH-001", expiry_date=today + timedelta(days=540),
                      quantity=Decimal(300)))
     if not db.scalar(select(PurchaseOrder.id).where(PurchaseOrder.reference_number == PREFIX + "PO-001")):
         po = PurchaseOrder(facility_id=facilities["13080"].id,
                            supplier_name="Kenya Medical Supplies Authority (KEMSA) — synthetic order",
                            supplier_source_name="KEMSA official website",
                            supplier_source_url="https://kemsa.go.ke/", supplier_source_type="KEMSA",
-                           expected_delivery_date=date.today() + timedelta(days=10),
+                           expected_delivery_date=today + timedelta(days=10),
                            status=PurchaseOrderStatus.CONFIRMED,
                            reference_number=PREFIX + "PO-001", created_by=admin.id)
         db.add(po)
@@ -274,7 +283,7 @@ def seed_batches_procurement(db, facilities, medicines, admin):
                                  quantity_ordered=Decimal(50), quantity_received=Decimal(0)))
 
 
-def seed_forecast_scenarios(db, facilities, medicines, admin):
+def seed_forecast_scenarios(db, facilities, medicines, admin, as_of=None):
     from fastapi import HTTPException
 
     from app.services.forecasting import generate_forecast
@@ -290,8 +299,8 @@ def seed_forecast_scenarios(db, facilities, medicines, admin):
             pairs.append((code, "Epinephrine (adrenaline)", "1 mg/1 mL ampoule"))
     for facility_code, name, strength in pairs:
         facility, medicine = facilities[facility_code], by_name[(name, strength)]
-        run = generate_forecast(db, facility.id, medicine.id, ForecastModelCode.MOVING_AVERAGE_7D, 14, 90)
-        generate_risk_assessment(db, facility.id, medicine.id, run.id)
+        run = generate_forecast(db, facility.id, medicine.id, ForecastModelCode.MOVING_AVERAGE_7D, 14, DAYS, as_of=as_of)
+        generate_risk_assessment(db, facility.id, medicine.id, run.id, assessment_date=as_of)
     # Scenario A: the actor and approval are explicitly synthetic demonstrations.
     from app.schemas.transfers import TransferCreate
     from app.services.redistribution import decide_recommendation
@@ -319,15 +328,18 @@ def seed_forecast_scenarios(db, facilities, medicines, admin):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--as-of", type=date.fromisoformat, default=date.today())
+    as_of = parser.parse_args().as_of
     with SessionLocal() as db:
         facilities, medicines = seed_reference(db)
         users = seed_roles_users_models(db, facilities)
         admin = users["grace.njeri.demo@medstock.example"]
-        fresh = seed_operations(db, facilities, medicines, admin)
-        seed_batches_procurement(db, facilities, medicines, admin)
+        fresh = seed_operations(db, facilities, medicines, admin, as_of)
+        seed_batches_procurement(db, facilities, medicines, admin, as_of)
         db.commit()
         if fresh:
-            seed_forecast_scenarios(db, facilities, medicines, admin)
+            seed_forecast_scenarios(db, facilities, medicines, admin, as_of)
         print(f"Kenya/Nairobi reference seed: {len(facilities)} facilities, {len(medicines)} KEML formulations; "
               f"synthetic operations {'created' if fresh else 'already present'}. No live hospital data.")
 

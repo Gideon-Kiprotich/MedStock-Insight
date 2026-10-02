@@ -6,6 +6,7 @@ from app.api.routes import (
     auth,
     dashboard,
     decision_support,
+    experiments,
     facilities,
     forecasts,
     inventory,
@@ -43,6 +44,7 @@ app.include_router(transfers.router, prefix="/api/v1")
 app.include_router(audit.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(decision_support.router, prefix="/api/v1")
+app.include_router(experiments.router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["System"])

@@ -1,6 +1,7 @@
+import type { AggregateEvaluation } from '../types/analytics';
 import React, { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { DashboardResponse, ForecastEvaluation, RiskLevel } from '../types/api';
+import type { DashboardResponse, RiskLevel } from '../types/api';
 import { DataBadge } from '../components/common/DataBadge';
 import {
   AlertTriangle,
@@ -17,7 +18,7 @@ interface DashboardPageProps {
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const [data, setData] = useState<DashboardResponse | null>(null);
-  const [evaluation, setEvaluation] = useState<ForecastEvaluation | null>(null);
+  const [evaluation, setEvaluation] = useState<AggregateEvaluation | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,7 +28,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     try {
       const res = await api.getDashboard();
       setData(res);
-      api.getForecastEvaluation({ limit: 1 }).then(setEvaluation).catch(() => setEvaluation(null));
+      api.getAggregateEvaluation().then(setEvaluation).catch(() => setEvaluation(null));
     } catch (err: any) {
       setError(err?.message || 'Failed to load dashboard operational read model.');
     } finally {
@@ -107,6 +108,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         </button>
       </div>
 
+      <div className="flex flex-wrap gap-3">
+        <button onClick={() => onNavigate('scenario')} className="rounded-lg border border-indigo-200 bg-white px-4 py-2 text-sm font-semibold text-indigo-700">Open Scenario Analysis</button>
+        <button onClick={() => onNavigate('reports')} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">View Decision Analytics</button>
+      </div>
       {/* Priority Summary Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div
@@ -196,14 +201,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       <section className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div><h3 className="text-sm font-bold text-slate-900">Forecasting performance</h3>
-            <p className="text-xs text-slate-500">Measured 14-day temporal holdout on one recorded series; synthetic demo data, not future accuracy.</p></div>
+            <p className="text-xs text-slate-500">Measured 14-day temporal holdout across eligible recorded series; synthetic demo data, not future accuracy.</p></div>
           <button onClick={() => onNavigate('forecasts')} className="text-xs font-semibold text-indigo-700">View evaluation →</button>
         </div>
-        {evaluation ? <div className="flex flex-wrap gap-3 mt-3">{evaluation.results.map((row) =>
+        {evaluation ? <div className="flex flex-wrap gap-3 mt-3">{evaluation.overall.map((row) =>
           <div key={row.model} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs min-w-40">
             <strong className="block text-slate-900">{row.model === 'MOVING_AVERAGE_7D' ? 'Moving Average' : 'Random Forest'}</strong>
-            <span className="block text-slate-500 mb-1">{row.facility_name} · {row.medicine_name}</span>
-            {row.status === 'MEASURED' ? <span>MAE {row.mae?.toFixed(2)} · RMSE {row.rmse?.toFixed(2)} · n={row.observations}</span> : <span>Insufficient data</span>}
+            <span className="block text-slate-500 mb-1">{row.evaluated_series} evaluated series</span>
+            <span>MAE {row.mae.toFixed(2)} · RMSE {row.rmse.toFixed(2)} · WAPE {row.wape?.toFixed(2) ?? "—"}% · n={row.observations}</span>
           </div>)}</div> : <p className="mt-3 text-xs text-slate-500">Evaluation unavailable.</p>}
       </section>
 

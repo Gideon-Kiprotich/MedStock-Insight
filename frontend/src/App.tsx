@@ -1,3 +1,5 @@
+import { ScenarioAnalysisPage } from './pages/ScenarioAnalysisPage';
+import { DecisionAnalyticsPage } from './pages/DecisionAnalyticsPage';
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginPage } from './pages/LoginPage';
@@ -86,6 +88,8 @@ const MainApp: React.FC = () => {
 
           {currentTab === 'forecasts' && <ForecastsPage />}
 
+          {currentTab === 'scenario' && <ScenarioAnalysisPage />}
+
           {currentTab === 'risk' && <StockoutRiskPage />}
 
           {currentTab === 'redistribution' && (
@@ -109,12 +113,7 @@ const MainApp: React.FC = () => {
             />
           )}
 
-          {currentTab === 'reports' && (
-            <PlaceholderPage
-              title="Operational Reports"
-              description="Statutory supply chain reporting and export module. Data summary metrics are available on the main Dashboard."
-            />
-          )}
+          {currentTab === 'reports' && <DecisionAnalyticsPage />}
 
           {currentTab === 'users' && <UsersPage />}
 

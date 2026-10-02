@@ -181,6 +181,7 @@ def generate_forecast(
     model_code: ForecastModelCode,
     horizon_days: int,
     lookback_days: int,
+    as_of: date | None = None,
 ) -> ForecastRun:
     facility = db.get(Facility, facility_id)
     medicine = db.get(Medicine, medicine_id)
@@ -195,7 +196,7 @@ def generate_forecast(
     if model_version is None:
         raise HTTPException(status_code=400, detail=f"Forecast model {model_code} is not configured")
 
-    today = date.today()
+    today = as_of or date.today()
     start_date = today - timedelta(days=lookback_days - 1)
     daily = build_daily_consumption(db, facility_id, medicine_id, start_date, today)
     values = [value for _, value in daily]

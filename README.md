@@ -160,3 +160,15 @@ Approval revalidates donor stock and safety stock and expires stale recommendati
 The Forecasts page compares seven-day moving average and Random Forest with a shared final 14-day temporal holdout, reporting MAE, RMSE, WAPE and observation counts only when history is sufficient. Select a forecast to see its implemented feature definitions. Stockout Risk and Redistribution expose backend-sourced explanations and preserve human approval before transfer execution.
 
 After seeding a disposable demo database, run scripts/verify_phase9.py to check all six controlled scenarios, or scripts/evaluate_phase9.py to evaluate every synthetic facility–medicine series. See [scenario assumptions](docs/phase9_scenarios.md). These measurements describe simulated consumption and do not establish real-world accuracy.
+
+## Phase 10 experiments
+
+Scenario Analysis compares controlled assumptions with saved baseline inputs;
+Decision Analytics and Demand Forecasts provide pooled temporal evaluation by
+model, facility and medicine. All operational data remains synthetic.
+
+See [Phase 10 assumptions and reproducibility](docs/phase10_experiments.md) for
+fresh two-year seeding, evaluation commands, simulation isolation and coverage
+limits. Apply the new migration with `uv run alembic upgrade head` before starting
+the API. Existing seeded ledgers are preserved; use a separate empty disposable
+database to generate the longer history.

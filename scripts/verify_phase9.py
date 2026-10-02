@@ -57,7 +57,7 @@ def main():
             ("DEMO_REDISTRIBUTION", "Kenyatta to Mbagathi", "Paracetamol 500 mg",
              recommendation is not None and recommendation.recommended_quantity > 0,
              f"pending_quantity={recommendation.recommended_quantity if recommendation else 'missing'}"),
-            ("DEMO_NO_FEASIBLE_DONOR", "Nairobi East", "Epinephrine 1 mg/mL",
+            ("DEMO_NO_FEASIBLE_DONOR", facilities["34027"].name, "Epinephrine 1 mg/mL",
              shortage is not None and shortage.projected_shortage_units > 0 and not epi_surplus,
              f"shortage={shortage.projected_shortage_units if shortage else 'missing'}, donors={len(epi_surplus)}"),
             ("DEMO_SAFETY_STOCK_CONSTRAINT", "Kenyatta", "Epinephrine 1 mg/mL",
