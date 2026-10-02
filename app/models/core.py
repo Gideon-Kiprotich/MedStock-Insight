@@ -10,6 +10,7 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     Numeric,
@@ -94,7 +95,13 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    title: Mapped[str | None] = mapped_column(String(100))
+    facility_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("facilities.id"))
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_demo_user: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
     role: Mapped[Role] = relationship(back_populates="users")
+    facility: Mapped[Facility | None] = relationship()
 
 
 class Role(Base):
@@ -115,6 +122,34 @@ class Facility(Base):
     code: Mapped[str] = mapped_column(String(30), unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     county: Mapped[str | None] = mapped_column(String(100))
+    official_name: Mapped[str | None] = mapped_column(String(200))
+    display_name: Mapped[str | None] = mapped_column(String(200))
+    kmhfr_code: Mapped[str | None] = mapped_column(String(30), unique=True)
+    sub_county: Mapped[str | None] = mapped_column(String(100))
+    ward: Mapped[str | None] = mapped_column(String(100))
+    latitude: Mapped[float | None] = mapped_column(Float)
+    longitude: Mapped[float | None] = mapped_column(Float)
+    keph_level: Mapped[str | None] = mapped_column(String(50))
+    ownership_category: Mapped[str | None] = mapped_column(String(100))
+    operational_status: Mapped[str | None] = mapped_column(String(50))
+    service_24_hour: Mapped[bool | None] = mapped_column(Boolean)
+    weekend_service: Mapped[bool | None] = mapped_column(Boolean)
+    bed_capacity: Mapped[int | None] = mapped_column(Integer)
+    maternity_beds: Mapped[int | None] = mapped_column(Integer)
+    icu_beds: Mapped[int | None] = mapped_column(Integer)
+    hdu_beds: Mapped[int | None] = mapped_column(Integer)
+    emergency_beds: Mapped[int | None] = mapped_column(Integer)
+    cots: Mapped[int | None] = mapped_column(Integer)
+    key_services: Mapped[list | None] = mapped_column(JSON)
+    reference_note: Mapped[str | None] = mapped_column(Text)
+    transfer_eligible: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    source_name: Mapped[str | None] = mapped_column(String(150))
+    source_url: Mapped[str | None] = mapped_column(Text)
+    source_type: Mapped[str | None] = mapped_column(String(50))
+    source_record_id: Mapped[str | None] = mapped_column(String(100))
+    source_version: Mapped[str | None] = mapped_column(String(50))
+    retrieved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    verification_status: Mapped[str | None] = mapped_column(String(50))
     facility_type: Mapped[str | None] = mapped_column(String(100))
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -129,6 +164,18 @@ class Medicine(Base):
     strength: Mapped[str | None] = mapped_column(String(100))
     dosage_form: Mapped[str | None] = mapped_column(String(100))
     category: Mapped[str | None] = mapped_column(String(100))
+    keml_section: Mapped[str | None] = mapped_column(String(30))
+    level_of_use: Mapped[int | None] = mapped_column(Integer)
+    aware_classification: Mapped[str | None] = mapped_column(String(30))
+    restricted: Mapped[bool | None] = mapped_column(Boolean)
+    keml_notes: Mapped[str | None] = mapped_column(Text)
+    source_name: Mapped[str | None] = mapped_column(String(150))
+    source_url: Mapped[str | None] = mapped_column(Text)
+    source_type: Mapped[str | None] = mapped_column(String(50))
+    source_record_id: Mapped[str | None] = mapped_column(String(100))
+    source_version: Mapped[str | None] = mapped_column(String(50))
+    retrieved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    verification_status: Mapped[str | None] = mapped_column(String(50))
     unit_of_measure: Mapped[str] = mapped_column(String(30), nullable=False, default="unit")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -261,6 +308,9 @@ class PurchaseOrder(Base):
         UUID(as_uuid=True), ForeignKey("facilities.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     supplier_name: Mapped[str | None] = mapped_column(String(200))
+    supplier_source_name: Mapped[str | None] = mapped_column(String(150))
+    supplier_source_url: Mapped[str | None] = mapped_column(Text)
+    supplier_source_type: Mapped[str | None] = mapped_column(String(50))
     expected_delivery_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     status: Mapped[PurchaseOrderStatus] = mapped_column(
         SAEnum(PurchaseOrderStatus, name="purchase_order_status"), nullable=False

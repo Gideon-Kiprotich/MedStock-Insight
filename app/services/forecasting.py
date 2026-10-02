@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
+from math import sqrt
 from statistics import mean, pstdev
 from uuid import UUID
 
@@ -96,17 +97,17 @@ def _moving_average_predict(values: list[float], horizon: int, window: int = 7) 
     )
 
 
-def _rf_features(series: list[float], index: int) -> list[float]:
+def _rf_features(series: list[float], index: int, start_date: date = date(2024, 1, 1)) -> list[float]:
     return [
         series[index - 1],
         series[index - 7],
         mean(series[index - 7 : index]),
         mean(series[max(0, index - 28) : index]),
-        float(index % 7),
+        float((start_date + timedelta(days=index)).weekday()),
     ]
 
 
-def _random_forest_predict(values: list[float], horizon: int) -> ForecastResult:
+def _random_forest_predict(values: list[float], horizon: int, start_date: date = date(2024, 1, 1)) -> ForecastResult:
     if RandomForestRegressor is None:
         raise RuntimeError("scikit-learn is required for RANDOM_FOREST forecasts")
     if len(values) < 28:
@@ -116,7 +117,7 @@ def _random_forest_predict(values: list[float], horizon: int) -> ForecastResult:
     split = len(values) - holdout
     train_values = values[:split]
 
-    x_train = [_rf_features(train_values, i) for i in range(28, len(train_values))]
+    x_train = [_rf_features(train_values, i, start_date) for i in range(28, len(train_values))]
     y_train = train_values[28:]
     if not x_train:
         raise ValueError("Insufficient observations after feature construction")
@@ -133,12 +134,12 @@ def _random_forest_predict(values: list[float], horizon: int) -> ForecastResult:
     eval_history = train_values[:]
     eval_predictions: list[float] = []
     for idx in range(split, len(values)):
-        pred = max(0.0, float(model.predict([_rf_features(eval_history, len(eval_history))])[0]))
+        pred = max(0.0, float(model.predict([_rf_features(eval_history, len(eval_history), start_date)])[0]))
         eval_predictions.append(pred)
         eval_history.append(values[idx])
     mae = mean(abs(a - p) for a, p in zip(values[split:], eval_predictions))
 
-    full_x = [_rf_features(values, i) for i in range(28, len(values))]
+    full_x = [_rf_features(values, i, start_date) for i in range(28, len(values))]
     full_y = values[28:]
     full_model = RandomForestRegressor(
         n_estimators=200,
@@ -152,7 +153,7 @@ def _random_forest_predict(values: list[float], horizon: int) -> ForecastResult:
     history = values[:]
     predictions: list[float] = []
     for _ in range(horizon):
-        pred = max(0.0, float(full_model.predict([_rf_features(history, len(history))])[0]))
+        pred = max(0.0, float(full_model.predict([_rf_features(history, len(history), start_date)])[0]))
         predictions.append(pred)
         history.append(pred)
 
@@ -165,11 +166,11 @@ def _random_forest_predict(values: list[float], horizon: int) -> ForecastResult:
     )
 
 
-def _forecast_result(values: list[float], model_code: ForecastModelCode, horizon: int) -> ForecastResult:
+def _forecast_result(values: list[float], model_code: ForecastModelCode, horizon: int, start_date: date = date(2024, 1, 1)) -> ForecastResult:
     if model_code == ForecastModelCode.MOVING_AVERAGE_7D:
         return _moving_average_predict(values, horizon)
     if model_code == ForecastModelCode.RANDOM_FOREST:
-        return _random_forest_predict(values, horizon)
+        return _random_forest_predict(values, horizon, start_date)
     raise ValueError(f"Unsupported model: {model_code}")
 
 
@@ -209,12 +210,13 @@ def generate_forecast(
         raise HTTPException(status_code=422, detail="RANDOM_FOREST requires at least 28 daily observations")
 
     try:
-        result = _forecast_result(values, model_code, horizon_days)
+        result = _forecast_result(values, model_code, horizon_days, start_date)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    evaluation = evaluate_series(values, model_code, start_date)
     forecast_start = today + timedelta(days=1)
     run = ForecastRun(
         facility_id=facility_id,
@@ -225,7 +227,7 @@ def generate_forecast(
         training_start_date=start_date,
         training_end_date=today,
         data_points_used=len(values),
-        mae=Decimal(str(round(result.mae, 4))) if result.mae is not None else None,
+        mae=Decimal(str(round(evaluation.mae, 4))) if evaluation else None,
         status=ForecastRunStatus.COMPLETED,
     )
     db.add(run)
@@ -245,3 +247,70 @@ def generate_forecast(
     db.commit()
     db.refresh(run)
     return run
+
+
+@dataclass(frozen=True)
+class EvaluationResult:
+    model: ForecastModelCode
+    training_observations: int
+    observations: int
+    mae: float
+    rmse: float
+    wape: float | None
+    actual: list[float]
+    predicted: list[float]
+
+
+MIN_TRAIN_DAYS = 42
+HOLDOUT_DAYS = 14
+FEATURE_NAMES = (
+    "lag_1_consumption", "lag_7_consumption", "rolling_mean_7d",
+    "rolling_mean_28d", "day_of_week",
+)
+
+
+def evaluate_series(
+    values: list[float], model_code: ForecastModelCode,
+    start_date: date = date(2024, 1, 1),
+) -> EvaluationResult | None:
+    """Evaluate one-step predictions on the final 14 days without future leakage.
+
+    Training precedes every holdout target. Earlier holdout actuals may be used
+    for later one-step predictions, but the fitted RF is never retrained on them.
+    """
+    if len(values) < MIN_TRAIN_DAYS + HOLDOUT_DAYS:
+        return None
+    split = len(values) - HOLDOUT_DAYS
+    train, actual = values[:split], values[split:]
+    if sum(value > 0 for value in train) < 14 or sum(value > 0 for value in actual) < 2:
+        return None
+    model = None
+    if model_code == ForecastModelCode.RANDOM_FOREST:
+        if RandomForestRegressor is None:
+            raise RuntimeError("scikit-learn is required for RANDOM_FOREST evaluation")
+        model = RandomForestRegressor(
+            n_estimators=200, max_depth=12, min_samples_leaf=2,
+            random_state=42, n_jobs=1,
+        )
+        model.fit(
+            [_rf_features(train, index, start_date) for index in range(28, split)],
+            train[28:],
+        )
+    elif model_code != ForecastModelCode.MOVING_AVERAGE_7D:
+        raise ValueError(f"Unsupported model: {model_code}")
+    history = train[:]
+    predictions = []
+    for value in actual:
+        predicted = (mean(history[-7:]) if model is None else
+                     float(model.predict([_rf_features(history, len(history), start_date)])[0]))
+        predictions.append(max(0.0, predicted))
+        history.append(value)
+    errors = [a - p for a, p in zip(actual, predictions)]
+    total_actual = sum(abs(value) for value in actual)
+    return EvaluationResult(
+        model=model_code, training_observations=split, observations=len(actual),
+        mae=mean(abs(error) for error in errors),
+        rmse=sqrt(mean(error * error for error in errors)),
+        wape=100 * sum(abs(error) for error in errors) / total_actual if total_actual else None,
+        actual=actual, predicted=predictions,
+    )

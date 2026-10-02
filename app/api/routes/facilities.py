@@ -22,9 +22,9 @@ def list_facilities(
 ) -> CollectionResponse[FacilityResponse]:
     page = max(page, 1)
     page_size = min(max(page_size, 1), 200)
-    total = db.scalar(select(func.count()).select_from(Facility)) or 0
+    total = db.scalar(select(func.count()).select_from(Facility).where(Facility.is_active.is_(True))) or 0
     items = db.scalars(
-        select(Facility).order_by(Facility.name).offset((page - 1) * page_size).limit(page_size)
+        select(Facility).where(Facility.is_active.is_(True)).order_by(Facility.name).offset((page - 1) * page_size).limit(page_size)
     ).all()
     return CollectionResponse(
         data=[FacilityResponse.model_validate(item) for item in items],
@@ -41,7 +41,7 @@ def create_facility(
     exists = db.scalar(select(Facility).where(Facility.code == payload.code.upper()))
     if exists:
         raise HTTPException(status_code=409, detail="Facility code already exists")
-    facility = Facility(code=payload.code.upper(), **payload.model_dump(exclude={"code"}))
+    facility = Facility(code=payload.code.upper(), source_type="SYNTHETIC", verification_status="UNVERIFIED", **payload.model_dump(exclude={"code"}))
     db.add(facility)
     db.commit()
     db.refresh(facility)

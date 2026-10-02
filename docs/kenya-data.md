@@ -1,0 +1,17 @@
+# Kenya/Nairobi reference and simulation data
+
+## SOURCE-VERIFIED REFERENCE DATA
+
+The nine facility identities, KMHFR codes, locations, levels, ownership classes and recorded capacities in [KMHFR](https://kmhfr.health.go.ke/public/about) were transcribed from individual public registry pages on 2026-09-30. The 51 name/form/strength combinations and Levels of Use come from the [Kenya Essential Medicines List 2023](https://extranet.who.int/cpcd/sites/default/files/public_file_repository/KEN_Kenya_Kenya-Essential-Medicines-List-2023_2023.pdf). AWaRe is populated only where checked; null means unverified here. The [KEMSA website](https://kemsa.go.ke/) supports supplier identity only, not any order. Source URLs, record IDs, retrieval date and verification status are stored per facility and medicine.
+
+KMHFR calls code 12867 “Aga Khan Hospital”; the [hospital website](https://hospitals.aku.edu/kenya/about-us) uses “Aga Khan University Hospital, Nairobi”. Both are retained as official and display names respectively. KMHFR reports zero maternity beds for Pumwani Maternity Hospital; that value is retained with a note. Null means the field was not verified in this catalogue. Transfer eligibility is project configuration for six public facilities, never a statement of organizational consent.
+
+Configured coverage: 9 facilities (6 Ministry of Health, 3 private practice; KEPH levels 4: 3, 5: 4, 6: 2), all with KMHFR URLs. There are 51 distinct KEML formulation/strength records across 11 categories: Analgesics 5; Antimicrobials 12; Antimalarials 3; Cardiovascular 6; Diabetes 4; Gastrointestinal 5; Respiratory 3; Maternal and newborn 4; Mental health 4; Emergency 2; Dermatological 3. AWaRe is explicitly recorded for 5 formulations.
+
+## SYNTHETIC DEMONSTRATION DATA
+
+The seed script uses fixed random seed 20260930 and SHA-256-derived per-series streams. Six public-facility profiles select 248 facility–medicine series; the private facilities are reference context only. On a fresh database, 365 daily observations per series produce 90,520 synthetic consumption records. Demand uses facility intensity, medicine category, weekday, annual sine-season, 8% trend, occasional spikes/dips and bounded random variation. Receipts vary, a five-day stockout interval is inserted per series, and consumption never exceeds on-hand stock. All entries are ledger transactions, and balances are calculated from those entries; ML never writes balances. A synthetic KEMSA-labelled purchase order is not a real procurement event.
+
+Scenario A runs synthetic Amoxicillin shortage → recommendation → synthetic actor approval → dispatch → completion and audit. A Paracetamol shortage and an Oxytocin maternity scenario remain for review; Oxytocin donor surplus is capped by safety stock. A police-hospital epinephrine shortage has no eligible donor; the service returns NO_FEASIBLE_DONOR. These are demonstration policies and quantities, not measured facility needs. Demo users have invented Kenyan-style names, non-deliverable .example addresses and explicit demo flags. No patient data is generated.
+
+Run alembic upgrade head, python scripts/seed.py, then python scripts/data_quality_report.py against a disposable database to measure resulting operational data. Re-running the seed preserves generated transactions, transfers and audit records; start with an empty database to regenerate the time window. Existing legacy generic reference rows are archived rather than deleted.

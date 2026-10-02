@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, EmailStr
 
@@ -26,4 +27,8 @@ class UserResponse(ORMModel):
     email: EmailStr
     full_name: str
     is_active: bool
+    title: str | None = None
+    facility_id: uuid.UUID | None = None
+    last_login_at: datetime | None = None
+    is_demo_user: bool = False
     role: RoleResponse

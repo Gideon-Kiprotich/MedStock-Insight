@@ -24,6 +24,7 @@ from app.models.core import (
     RedistributionRecommendationStatus,
     RiskAssessment,
 )
+from app.services.audit import log_audit_event
 
 CALCULATION_VERSION = "redistribution-1.0"
 DEFAULT_EXPIRY_HOURS = 24
@@ -188,7 +189,7 @@ def _latest_risk_assessment(db: Session, facility_id: UUID, medicine_id: UUID) -
 
 
 def get_surplus_candidates(db: Session, medicine_id: UUID, planning_horizon_days: int) -> list[FacilityStockPosition]:
-    facilities = db.scalars(select(Facility).where(Facility.is_active.is_(True)).order_by(Facility.code)).all()
+    facilities = db.scalars(select(Facility).where(Facility.is_active.is_(True), Facility.transfer_eligible.is_(True)).order_by(Facility.code)).all()
     candidates: list[FacilityStockPosition] = []
     for facility in facilities:
         try:
@@ -230,6 +231,8 @@ def generate_recommendation(
         raise HTTPException(status_code=404, detail="Medicine not found or inactive")
     if destination is None:
         raise HTTPException(status_code=404, detail="Destination facility not found or inactive")
+    if not destination.transfer_eligible:
+        raise HTTPException(status_code=422, detail="Facility is outside the demonstration redistribution network")
 
     destination_position = _get_position(
         db, destination_facility_id, medicine_id, planning_horizon_days, destination_forecast_run_id
@@ -239,10 +242,13 @@ def generate_recommendation(
     if destination_position.calculated_shortage <= 0:
         raise HTTPException(status_code=422, detail="Destination has no calculated shortage for the planning horizon")
 
-    source_ids = [source_facility_id] if source_facility_id else [f.id for f in db.scalars(select(Facility).where(Facility.is_active.is_(True))).all()]
+    source_ids = [source_facility_id] if source_facility_id else [f.id for f in db.scalars(select(Facility).where(Facility.is_active.is_(True), Facility.transfer_eligible.is_(True))).all()]
     source_candidates: list[FacilityStockPosition] = []
     for candidate_id in source_ids:
         if candidate_id == destination_facility_id:
+            continue
+        candidate_facility = db.get(Facility, candidate_id)
+        if candidate_facility is None or not candidate_facility.transfer_eligible:
             continue
         try:
             position = _get_position(db, candidate_id, medicine_id, planning_horizon_days, None)
@@ -252,7 +258,7 @@ def generate_recommendation(
             source_candidates.append(position)
 
     if not source_candidates:
-        raise HTTPException(status_code=422, detail="No feasible donor facility with available surplus was found")
+        raise HTTPException(status_code=422, detail="NO_FEASIBLE_DONOR: No eligible facility has available surplus")
 
     # Deterministic operational choice: donor with the largest feasible surplus.
     source_position = max(source_candidates, key=lambda item: (item.available_surplus, str(item.facility_id)))
@@ -304,6 +310,13 @@ def generate_recommendation(
     return recommendation
 
 
+
+def _ensure_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def decide_recommendation(
     db: Session,
     recommendation_id: UUID,
@@ -317,7 +330,7 @@ def decide_recommendation(
     if recommendation.status != RedistributionRecommendationStatus.PENDING_REVIEW:
         raise HTTPException(status_code=409, detail=f"Recommendation is already {recommendation.status.value}")
     now = datetime.now(timezone.utc)
-    if recommendation.expires_at <= now:
+    if _ensure_utc(recommendation.expires_at) <= now:
         recommendation.status = RedistributionRecommendationStatus.EXPIRED
         recommendation.reviewed_by = reviewer_id
         recommendation.reviewed_at = now
@@ -325,6 +338,7 @@ def decide_recommendation(
         db.commit()
         raise HTTPException(status_code=409, detail="Redistribution recommendation has expired")
 
+    prev_status = recommendation.status.value
     if approved:
         # Revalidate the critical conditions against current stock and policy before approval.
         source = _current_inventory(db, recommendation.source_facility_id, recommendation.medicine_id)
@@ -354,12 +368,26 @@ def decide_recommendation(
             "revalidated_at": now.isoformat(),
         }
         recommendation.status = RedistributionRecommendationStatus.APPROVED
+        action = "RECOMMENDATION_APPROVED"
     else:
         recommendation.status = RedistributionRecommendationStatus.REJECTED
+        action = "RECOMMENDATION_REJECTED"
 
     recommendation.reviewed_by = reviewer_id
     recommendation.reviewed_at = now
     recommendation.review_note = note
+
+    log_audit_event(
+        db=db,
+        user_id=reviewer_id,
+        action=action,
+        entity_type="redistribution_recommendation",
+        entity_id=recommendation.id,
+        previous_state={"status": prev_status},
+        new_state={"status": recommendation.status.value},
+        details={"note": note, "recommended_quantity": str(recommendation.recommended_quantity)},
+    )
+
     db.commit()
     db.refresh(recommendation)
     return recommendation

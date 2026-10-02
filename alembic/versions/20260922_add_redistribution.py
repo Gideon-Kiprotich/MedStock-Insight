@@ -23,11 +23,11 @@ def upgrade() -> None:
     bind = op.get_bind()
     status_enum.create(bind, checkfirst=True)
 
-    op.create_unique_constraint(
-        "uq_inventory_balance_facility_medicine",
-        "inventory_balances",
-        ["facility_id", "medicine_id"],
-    )
+    with op.batch_alter_table("inventory_balances") as batch_op:
+        batch_op.create_unique_constraint(
+            "uq_inventory_balance_facility_medicine",
+            ["facility_id", "medicine_id"],
+        )
 
     op.create_table(
         "redistribution_recommendations",
@@ -65,7 +65,7 @@ def upgrade() -> None:
     op.create_index("ix_redistribution_recommendations_source_facility_id", "redistribution_recommendations", ["source_facility_id"])
     op.create_index("ix_redistribution_recommendations_destination_facility_id", "redistribution_recommendations", ["destination_facility_id"])
     op.create_index("ix_redistribution_recommendations_medicine_id", "redistribution_recommendations", ["medicine_id"])
-    op.create_index("ix_redistribution_recommendations_destination_risk_assessment_id", "redistribution_recommendations", ["destination_risk_assessment_id"])
+    op.create_index("ix_redist_recom_dest_risk_id", "redistribution_recommendations", ["destination_risk_assessment_id"])
     op.create_index("ix_redistribution_recommendations_status", "redistribution_recommendations", ["status"])
     op.create_index("ix_redistribution_recommendations_expires_at", "redistribution_recommendations", ["expires_at"])
 
@@ -73,7 +73,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index("ix_redistribution_recommendations_expires_at", table_name="redistribution_recommendations")
     op.drop_index("ix_redistribution_recommendations_status", table_name="redistribution_recommendations")
-    op.drop_index("ix_redistribution_recommendations_destination_risk_assessment_id", table_name="redistribution_recommendations")
+    op.drop_index("ix_redist_recom_dest_risk_id", table_name="redistribution_recommendations")
     op.drop_index("ix_redistribution_recommendations_medicine_id", table_name="redistribution_recommendations")
     op.drop_index("ix_redistribution_recommendations_destination_facility_id", table_name="redistribution_recommendations")
     op.drop_index("ix_redistribution_recommendations_source_facility_id", table_name="redistribution_recommendations")

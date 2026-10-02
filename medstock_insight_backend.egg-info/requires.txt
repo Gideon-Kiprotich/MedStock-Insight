@@ -1,0 +1,17 @@
+fastapi<1,>=0.115
+uvicorn[standard]<1,>=0.30
+sqlalchemy<3,>=2
+psycopg[binary]<4,>=3
+alembic<2,>=1.14
+pydantic<3,>=2
+pydantic-settings<3,>=2
+pyjwt<3,>=2
+pwdlib[argon2]<1,>=0.2
+python-multipart<1,>=0.0.9
+email-validator<3,>=2
+scikit-learn<2,>=1.5
+
+[dev]
+pytest<9,>=8
+httpx<1,>=0.27
+ruff<1,>=0.8

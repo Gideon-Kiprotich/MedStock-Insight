@@ -2,7 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
+    audit,
     auth,
+    dashboard,
+    decision_support,
     facilities,
     forecasts,
     inventory,
@@ -10,6 +13,8 @@ from app.api.routes import (
     models,
     redistributions,
     risk,
+    transfers,
+    users,
 )
 from app.core.config import get_settings
 
@@ -26,6 +31,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
 app.include_router(facilities.router, prefix="/api/v1")
 app.include_router(medicines.router, prefix="/api/v1")
 app.include_router(inventory.router, prefix="/api/v1")
@@ -33,6 +39,10 @@ app.include_router(models.router, prefix="/api/v1")
 app.include_router(forecasts.router, prefix="/api/v1")
 app.include_router(risk.router, prefix="/api/v1")
 app.include_router(redistributions.router, prefix="/api/v1")
+app.include_router(transfers.router, prefix="/api/v1")
+app.include_router(audit.router, prefix="/api/v1")
+app.include_router(dashboard.router, prefix="/api/v1")
+app.include_router(decision_support.router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["System"])

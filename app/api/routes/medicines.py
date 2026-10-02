@@ -22,9 +22,9 @@ def list_medicines(
 ) -> CollectionResponse[MedicineResponse]:
     page = max(page, 1)
     page_size = min(max(page_size, 1), 200)
-    total = db.scalar(select(func.count()).select_from(Medicine)) or 0
+    total = db.scalar(select(func.count()).select_from(Medicine).where(Medicine.is_active.is_(True))) or 0
     items = db.scalars(
-        select(Medicine).order_by(Medicine.generic_name).offset((page - 1) * page_size).limit(page_size)
+        select(Medicine).where(Medicine.is_active.is_(True)).order_by(Medicine.generic_name).offset((page - 1) * page_size).limit(page_size)
     ).all()
     return CollectionResponse(
         data=[MedicineResponse.model_validate(item) for item in items],
@@ -41,7 +41,7 @@ def create_medicine(
     exists = db.scalar(select(Medicine).where(Medicine.code == payload.code.upper()))
     if exists:
         raise HTTPException(status_code=409, detail="Medicine code already exists")
-    medicine = Medicine(code=payload.code.upper(), **payload.model_dump(exclude={"code"}))
+    medicine = Medicine(code=payload.code.upper(), source_type="SYNTHETIC", verification_status="UNVERIFIED", **payload.model_dump(exclude={"code"}))
     db.add(medicine)
     db.commit()
     db.refresh(medicine)
