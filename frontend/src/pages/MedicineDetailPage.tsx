@@ -1,4 +1,5 @@
 import { medicineLabel } from '../utils/labels';
+import { consumptionChartPoints } from '../utils/consumption';
 import React, { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type {
@@ -106,11 +107,7 @@ export const MedicineDetailPage: React.FC<MedicineDetailPageProps> = ({ medicine
   // Construct chart data combining historical consumption (Zone 1) & forecast projection (Zone 2)
   const chartData = [
     // Historical consumption points
-    ...transactions.slice(0, 7).reverse().map((tx) => ({
-      date: tx.transaction_date,
-      value: tx.quantity,
-      type: 'Historical',
-    })),
+    ...consumptionChartPoints(transactions),
     // Forecast points
     ...points.map((pt) => ({
       date: pt.target_date,
@@ -256,9 +253,10 @@ export const MedicineDetailPage: React.FC<MedicineDetailPageProps> = ({ medicine
           {/* Time Series Chart with TODAY Divider */}
           <div>
             <h4 className="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-3">
-              Daily Demand Forecast (Historical Consumption vs Forecast Points)
+              Recorded Consumption and Forecast Points
             </h4>
             <div className="h-56 bg-slate-50 rounded-xl p-4 border border-slate-200">
+              <p className="text-xs text-slate-500 mb-2">Consumption uses only the loaded ledger page; missing dates are unknown. Recorded consumption is constrained by simulated stock availability.</p>
               {chartData.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-xs text-slate-500">
                   No daily forecast points generated yet.

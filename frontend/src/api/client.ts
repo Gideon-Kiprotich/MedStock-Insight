@@ -156,7 +156,6 @@ export const api = {
   // Facilities
   getFacilities: (page = 1, pageSize = 50) =>
     request<CollectionResponse<Facility>>(`/facilities?page=${page}&page_size=${pageSize}`),
-  getFacility: (id: string) => request<Facility>(`/facilities/${id}`),
 
   // Medicines
   getMedicines: (page = 1, pageSize = 200) =>

@@ -9,7 +9,6 @@ from app.models.core import (
     RedistributionTransferStatus,
     RiskLevel,
 )
-from app.schemas.common import ORMModel
 
 
 class DashboardInventoryHealth(BaseModel):

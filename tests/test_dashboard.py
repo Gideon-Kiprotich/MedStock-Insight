@@ -1,17 +1,14 @@
+import uuid
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-import uuid
 
 import pytest
-from fastapi import HTTPException
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.base import Base
 from app.models.core import (
-    Batch,
     Facility,
-    FacilityMedicinePolicy,
     ForecastRun,
     ForecastRunStatus,
     InventoryBalance,

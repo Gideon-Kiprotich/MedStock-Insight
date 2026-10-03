@@ -19,6 +19,7 @@ from app.models.core import (
     ForecastRun,
     InventoryBalance,
     Medicine,
+    MLModelVersion,
     PurchaseOrder,
     PurchaseOrderItem,
     PurchaseOrderStatus,
@@ -77,14 +78,19 @@ def capture_position(
         )
     ).all()
     run = db.get(ForecastRun, points[0].forecast_run_id)
+    model = db.get(MLModelVersion, run.model_version_id)
     return {
         "facility_id": str(facility.id),
+        "facility_code": facility.code,
         "facility_name": facility.name,
         "transfer_eligible": facility.transfer_eligible,
         "stock": str(balance.quantity_on_hand if balance else 0),
         "safety": str(policy.safety_stock),
         "forecast_run_id": str(run.id),
         "model_version_id": str(run.model_version_id),
+        "model_code": model.code.value,
+        "model_version": model.version,
+        "model_hyperparameters": model.hyperparameters,
         "points": [[p.target_date.isoformat(), str(p.predicted_demand)] for p in points],
         "incoming": [[d.isoformat(), str(q)] for d, q in incoming],
     }
@@ -141,7 +147,7 @@ def simulate(context: dict, params: dict) -> dict:
         result = position_result(context["destination"], today, demand, inventory, delay)
         donors = [(d, p) for d, p in donor_positions if p["available_surplus"] > 0]
         donor = (
-            max(donors, key=lambda item: (item[1]["available_surplus"], item[0]["facility_id"]))
+            max(donors, key=lambda item: (item[1]["available_surplus"], item[0].get("facility_code", item[0]["facility_id"])))
             if donors
             else None
         )
@@ -224,6 +230,20 @@ def save_experiment(
     return record
 
 
+def reproducibility_fingerprint(params: dict, context: dict) -> str:
+    """Hash stable reference codes/calculation inputs, retaining UUIDs in the original snapshot."""
+    def stable(value):
+        if isinstance(value, dict):
+            return {k: stable(v) for k, v in value.items() if k not in {
+                "facility_id", "medicine_id", "forecast_run_id", "model_version_id"
+            }}
+        if isinstance(value, list):
+            return [stable(v) for v in value]
+        return value
+    payload = {"parameters": stable(params), "context": stable(context)}
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+
+
 def serialize(record: AnalyticalExperiment) -> dict:
     return {
         "id": record.id,
@@ -231,6 +251,7 @@ def serialize(record: AnalyticalExperiment) -> dict:
         if record.created_at.tzinfo is None
         else record.created_at,
         "fingerprint": record.fingerprint,
+        "reproducibility_fingerprint": reproducibility_fingerprint(record.parameters, record.context),
         "parameters": record.parameters,
         "context": record.context,
         **record.result,
@@ -262,6 +283,7 @@ def create_scenario(db: Session, params: ScenarioParameters, user_id: UUID | Non
         "version": VERSION,
         "assessment_date": today.isoformat(),
         "destination": destination,
+        "medicine_code": medicine.code,
         "medicine_name": f"{medicine.generic_name} {medicine.strength or ''} {medicine.dosage_form or ''}",
         "donors": donors,
         "excluded_donors": excluded,

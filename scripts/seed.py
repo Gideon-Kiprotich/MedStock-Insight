@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import random
 import sys
 from datetime import date, datetime, timedelta
@@ -20,6 +21,7 @@ from uuid import uuid4
 
 from sqlalchemy import insert, select
 
+from app.core.config import get_settings
 from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models.core import (
@@ -135,6 +137,9 @@ def seed_reference(db):
 
 
 def seed_roles_users_models(db, facilities):
+    password = os.environ.get("MEDSTOCK_DEMO_PASSWORD", "")
+    if len(password) < 12:
+        raise ValueError("Set MEDSTOCK_DEMO_PASSWORD (at least 12 characters) for synthetic accounts")
     roles = {}
     for code, (name, description) in ROLE_DEFS.items():
         roles[code] = _upsert(db, Role, "code", code, {"code": code, "name": name, "description": description})
@@ -143,7 +148,7 @@ def seed_roles_users_models(db, facilities):
         user = db.scalar(select(User).where(User.email == email))
         if user is None:
             user = User(email=email, full_name=name, title=title, role_id=roles[role].id,
-                        facility_id=facilities[facility_code].id, password_hash=hash_password("ChangeMe123!"),
+                        facility_id=facilities[facility_code].id, password_hash=hash_password(password),
                         is_active=True, is_demo_user=True)
             db.add(user)
         else:
@@ -331,6 +336,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--as-of", type=date.fromisoformat, default=date.today())
     as_of = parser.parse_args().as_of
+    if get_settings().environment not in {"development", "test", "demonstration"}:
+        parser.error("Seeding is restricted to local demonstration/test environments")
     with SessionLocal() as db:
         facilities, medicines = seed_reference(db)
         users = seed_roles_users_models(db, facilities)

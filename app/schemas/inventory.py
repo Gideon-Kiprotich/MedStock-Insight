@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
@@ -35,6 +35,7 @@ class InventoryBalanceResponse(ORMModel):
     facility_id: uuid.UUID
     medicine_id: uuid.UUID
     quantity_on_hand: Decimal
+    updated_at: datetime
 
 
 class InventoryQuery(BaseModel):

@@ -16,6 +16,7 @@ from app.models.core import (
     FacilityMedicinePolicy,
     ForecastModelCode,
     ForecastRun,
+    ForecastRunStatus,
     InventoryBalance,
     InventoryTransaction,
     InventoryTransactionType,
@@ -71,15 +72,20 @@ def evaluate_network(
         .group_by(InventoryTransaction.facility_id, InventoryTransaction.medicine_id)
         .order_by(InventoryTransaction.facility_id, InventoryTransaction.medicine_id)
     ).all()
+    facilities = {f.id: f for f in db.scalars(select(Facility))}
+    medicines = {m.id: m for m in db.scalars(select(Medicine))}
+    pairs = sorted(pairs, key=lambda p: (facilities[p[0]].code, medicines[p[1]].code))
     rows, inputs = [], []
     for f, m, first, last in pairs:
         daily = build_daily_consumption(db, f, m, max(first, start), min(last, end))
         values = [v for _, v in daily]
-        facility, medicine = db.get(Facility, f), db.get(Medicine, m)
+        facility, medicine = facilities[f], medicines[m]
         inputs.append(
             {
                 "facility_id": str(f),
                 "medicine_id": str(m),
+                "facility_code": facility.code,
+                "medicine_code": medicine.code,
                 "start": daily[0][0].isoformat(),
                 "values": values,
             }
@@ -161,18 +167,20 @@ def latest_evaluation(db: Session) -> dict | None:
         else record.created_at,
         "fingerprint": record.fingerprint,
         "parameters": record.parameters,
-        **record.result,
+        **{k: v for k, v in record.result.items() if k != "results"},
     }
 
 
 def operational_summary(db: Session) -> dict:
     balances = db.scalars(select(InventoryBalance)).all()
+    facilities = {f.id: f for f in db.scalars(select(Facility))}
+    medicines = {m.id: m for m in db.scalars(select(Medicine))}
     policies = {
         (p.facility_id, p.medicine_id): p for p in db.scalars(select(FacilityMedicinePolicy)).all()
     }
     stock, low, stockouts = [], 0, 0
     for b in balances:
-        medicine, facility = db.get(Medicine, b.medicine_id), db.get(Facility, b.facility_id)
+        medicine, facility = medicines[b.medicine_id], facilities[b.facility_id]
         if not medicine.is_active or not facility.is_active:
             continue
         stock.append(
@@ -196,8 +204,13 @@ def operational_summary(db: Session) -> dict:
     risks = Counter(r.risk_level.value for r in latest_risk.values())
     surplus, shortages, infeasible, coverage = 0, 0, 0, 0
     positions = defaultdict(list)
-    for f, m in policies:
-        facility = db.get(Facility, f)
+    current_pairs = set(db.execute(select(ForecastRun.facility_id, ForecastRun.medicine_id).where(
+        ForecastRun.status == ForecastRunStatus.COMPLETED,
+        ForecastRun.forecast_start_date == date.today() + timedelta(days=1),
+        ForecastRun.horizon_days >= 14,
+    )).all())
+    for f, m in policies.keys() & current_pairs:
+        facility = facilities[f]
         if not facility.is_active:
             continue
         try:

@@ -13,11 +13,11 @@ from app.models.core import (
     InventoryBalance,
     InventoryTransaction,
     InventoryTransactionType,
-    Medicine,
     RedistributionRecommendation,
     RedistributionRecommendationStatus,
     RedistributionTransfer,
     RedistributionTransferStatus,
+    RoleCode,
     User,
 )
 from app.schemas.transfers import TransferCreate
@@ -35,7 +35,11 @@ def create_transfer(
     payload: TransferCreate,
     current_user: User,
 ) -> RedistributionTransfer:
-    recommendation = db.get(RedistributionRecommendation, payload.recommendation_id)
+    recommendation = db.scalar(
+        select(RedistributionRecommendation)
+        .where(RedistributionRecommendation.id == payload.recommendation_id)
+        .with_for_update().execution_options(populate_existing=True)
+    )
     if recommendation is None:
         raise HTTPException(status_code=404, detail="Redistribution recommendation not found")
 
@@ -85,7 +89,7 @@ def create_transfer(
             InventoryBalance.facility_id == recommendation.source_facility_id,
             InventoryBalance.medicine_id == recommendation.medicine_id,
         )
-        .with_for_update()
+        .with_for_update().execution_options(populate_existing=True)
     )
     available_stock = Decimal(source_balance.quantity_on_hand) if source_balance else Decimal("0")
     if payload.quantity > available_stock:
@@ -103,6 +107,8 @@ def create_transfer(
             raise HTTPException(status_code=400, detail="Batch does not belong to the source facility")
         if batch.medicine_id != recommendation.medicine_id:
             raise HTTPException(status_code=400, detail="Batch does not match the transfer medicine")
+        if batch.expiry_date < date.today():
+            raise HTTPException(status_code=409, detail="Expired batches cannot be transferred")
         if payload.quantity > Decimal(batch.quantity):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -149,7 +155,10 @@ def dispatch_transfer(
     transfer_id: UUID,
     current_user: User,
 ) -> RedistributionTransfer:
-    transfer = db.get(RedistributionTransfer, transfer_id)
+    transfer = db.scalar(
+        select(RedistributionTransfer).where(RedistributionTransfer.id == transfer_id)
+        .with_for_update().execution_options(populate_existing=True)
+    )
     if transfer is None:
         raise HTTPException(status_code=404, detail="Transfer not found")
 
@@ -190,7 +199,7 @@ def dispatch_transfer(
             InventoryBalance.facility_id == transfer.source_facility_id,
             InventoryBalance.medicine_id == transfer.medicine_id,
         )
-        .with_for_update()
+        .with_for_update().execution_options(populate_existing=True)
     )
     current_stock = Decimal(source_balance.quantity_on_hand) if source_balance else Decimal("0")
     if current_stock < transfer.quantity:
@@ -207,7 +216,7 @@ def dispatch_transfer(
 
     if transfer.batch_id is not None:
         batch = db.scalar(
-            select(Batch).where(Batch.id == transfer.batch_id).with_for_update()
+            select(Batch).where(Batch.id == transfer.batch_id).with_for_update().execution_options(populate_existing=True)
         )
         if batch is None or Decimal(batch.quantity) < transfer.quantity:
             batch_qty = Decimal(batch.quantity) if batch else Decimal("0")
@@ -215,6 +224,8 @@ def dispatch_transfer(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Insufficient batch quantity ({batch_qty}) to dispatch {transfer.quantity}",
             )
+        if batch.expiry_date < date.today():
+            raise HTTPException(status_code=409, detail="Expired batches cannot be dispatched")
         batch.quantity = Decimal(batch.quantity) - transfer.quantity
 
     source_balance.quantity_on_hand = current_stock - transfer.quantity
@@ -273,9 +284,16 @@ def complete_transfer(
     transfer_id: UUID,
     current_user: User,
 ) -> RedistributionTransfer:
-    transfer = db.get(RedistributionTransfer, transfer_id)
+    transfer = db.scalar(
+        select(RedistributionTransfer).where(RedistributionTransfer.id == transfer_id)
+        .with_for_update().execution_options(populate_existing=True)
+    )
     if transfer is None:
         raise HTTPException(status_code=404, detail="Transfer not found")
+
+    if (current_user.role.code == RoleCode.INVENTORY_OFFICER
+            and current_user.facility_id != transfer.destination_facility_id):
+        raise HTTPException(status_code=403, detail="Only the receiving facility officer may complete this transfer")
 
     # Idempotency check: If already COMPLETED, return idempotently without duplicate inventory movement
     if transfer.status == RedistributionTransferStatus.COMPLETED:
@@ -289,13 +307,14 @@ def complete_transfer(
 
     now = datetime.now(timezone.utc)
 
+    db.scalar(select(Facility).where(Facility.id == transfer.destination_facility_id).with_for_update())
     dest_balance = db.scalar(
         select(InventoryBalance)
         .where(
             InventoryBalance.facility_id == transfer.destination_facility_id,
             InventoryBalance.medicine_id == transfer.medicine_id,
         )
-        .with_for_update()
+        .with_for_update().execution_options(populate_existing=True)
     )
     if dest_balance is None:
         dest_balance = InventoryBalance(
@@ -318,7 +337,7 @@ def complete_transfer(
                     Batch.medicine_id == transfer.medicine_id,
                     Batch.batch_number == source_batch.batch_number,
                 )
-                .with_for_update()
+                .with_for_update().execution_options(populate_existing=True)
             )
             if dest_batch is None:
                 dest_batch = Batch(
@@ -388,7 +407,10 @@ def cancel_transfer(
     current_user: User,
     reason: str | None = None,
 ) -> RedistributionTransfer:
-    transfer = db.get(RedistributionTransfer, transfer_id)
+    transfer = db.scalar(
+        select(RedistributionTransfer).where(RedistributionTransfer.id == transfer_id)
+        .with_for_update().execution_options(populate_existing=True)
+    )
     if transfer is None:
         raise HTTPException(status_code=404, detail="Transfer not found")
 

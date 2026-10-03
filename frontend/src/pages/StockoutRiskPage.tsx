@@ -68,7 +68,7 @@ export const StockoutRiskPage: React.FC = () => {
 
   return (
     <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Stockout Risk Assessment Worklist</h2>
           <p className="text-xs text-slate-500 mt-1">
@@ -79,7 +79,7 @@ export const StockoutRiskPage: React.FC = () => {
       </div>
 
       {/* Filter Toolbar */}
-      <div className="flex items-center gap-4 p-4 rounded-xl bg-white border border-slate-200">
+      <div className="flex flex-wrap items-center gap-4 p-4 rounded-xl bg-white border border-slate-200">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
           <Filter className="w-4 h-4 text-blue-700" />
           <span>Filters:</span>
@@ -154,7 +154,7 @@ export const StockoutRiskPage: React.FC = () => {
                   <td className="py-3 px-4 font-bold text-slate-900">{item.inventory_on_hand}</td>
                   <td className="py-3 px-4 text-slate-500">{item.safety_stock}</td>
                   <td className="py-3 px-4 font-bold text-amber-700">
-                    {item.days_to_breach !== undefined && item.days_to_breach !== null ? `${item.days_to_breach} days` : 'Stockout'}
+                    {item.days_to_breach !== undefined && item.days_to_breach !== null ? `${item.days_to_breach} days` : 'No breach in horizon'}
                   </td>
                   <td className="py-3 px-4 text-slate-500">{item.projected_stockout_date || 'N/A'}</td>
                   <td className="py-3 px-4"><DataBadge type="PREDICTED" /></td>

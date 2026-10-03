@@ -9,7 +9,7 @@ export interface ScenarioOutcome {
   trajectory: { date: string; projected_stock: number; daily_demand: number }[];
 }
 export interface ScenarioResult {
-  id: string; created_at: string; fingerprint: string; label: string; parameters: ScenarioParameters;
+  id: string; created_at: string; fingerprint: string; reproducibility_fingerprint?: string; label: string; parameters: ScenarioParameters;
   context: { assessment_date: string; medicine_name: string; destination: { facility_name: string; forecast_run_id: string }; excluded_donors: {facility: string; reason: string}[] };
   baseline: ScenarioOutcome; scenario: ScenarioOutcome;
   differences: Record<string, number | string | null>; explanations: string[];

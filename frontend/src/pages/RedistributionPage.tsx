@@ -137,11 +137,12 @@ export const RedistributionPage: React.FC<RedistributionPageProps> = ({ onNaviga
     setActionLoading(true);
     setErrorMsg(null);
     try {
-      await api.generateRecommendation({
+      const created = await api.generateRecommendation({
         destination_facility_id: genDestId,
         medicine_id: genMedId,
         planning_horizon_days: Number(genHorizon),
       });
+      setSelectedRec(created);
       setShowGenerateModal(false);
       setGenDestId('');
       setGenMedId('');
@@ -355,7 +356,7 @@ export const RedistributionPage: React.FC<RedistributionPageProps> = ({ onNaviga
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="p-2 rounded bg-white border border-slate-200">
-                      <span className="text-slate-500 block text-[10px]">Current Stock</span>
+                      <span className="text-slate-500 block text-[10px]">Stock at proposal</span>
                       <strong className="text-slate-900">{selectedRec.source_inventory_before}</strong>
                     </div>
                     <div className="p-2 rounded bg-white border border-slate-200">
@@ -367,7 +368,7 @@ export const RedistributionPage: React.FC<RedistributionPageProps> = ({ onNaviga
                       <strong className="text-emerald-700">{selectedRec.source_surplus_units}</strong>
                     </div>
                     <div className="p-2 rounded bg-white border border-slate-200">
-                      <span className="text-slate-500 block text-[10px]">Projected Position After</span>
+                      <span className="text-slate-500 block text-[10px]">Projected end stock before transfer</span>
                       <strong className="text-slate-900">{selectedRec.source_projected_end_inventory}</strong>
                     </div>
                   </div>
@@ -385,7 +386,7 @@ export const RedistributionPage: React.FC<RedistributionPageProps> = ({ onNaviga
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="p-2 rounded bg-white border border-slate-200">
-                      <span className="text-slate-500 block text-[10px]">Current Stock</span>
+                      <span className="text-slate-500 block text-[10px]">Stock at proposal</span>
                       <strong className="text-slate-900">{selectedRec.destination_inventory_before}</strong>
                     </div>
                     <div className="p-2 rounded bg-white border border-slate-200">
@@ -397,7 +398,7 @@ export const RedistributionPage: React.FC<RedistributionPageProps> = ({ onNaviga
                       <strong className="text-red-700">{selectedRec.destination_shortage_units}</strong>
                     </div>
                     <div className="p-2 rounded bg-white border border-slate-200">
-                      <span className="text-slate-500 block text-[10px]">Projected Position After</span>
+                      <span className="text-slate-500 block text-[10px]">Projected end stock before transfer</span>
                       <strong className="text-slate-900">{selectedRec.destination_projected_end_inventory}</strong>
                     </div>
                   </div>

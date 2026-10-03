@@ -11,9 +11,11 @@ from app.models.core import (
     InventoryTransaction,
     InventoryTransactionType,
     Medicine,
+    RoleCode,
     User,
 )
 from app.schemas.inventory import InventoryTransactionCreate
+from app.services.audit import log_audit_event
 
 INCREASE_TYPES = {
     InventoryTransactionType.RECEIPT,
@@ -33,7 +35,12 @@ def record_inventory_transaction(
     payload: InventoryTransactionCreate,
     current_user: User,
 ) -> InventoryTransaction:
-    facility = db.scalar(select(Facility).where(Facility.id == payload.facility_id, Facility.is_active.is_(True)))
+    if (current_user.role.code == RoleCode.INVENTORY_OFFICER
+            and current_user.facility_id != payload.facility_id):
+        raise HTTPException(status_code=403, detail="Inventory officers may record only their assigned facility")
+    if payload.transaction_type in {InventoryTransactionType.TRANSFER_IN, InventoryTransactionType.TRANSFER_OUT}:
+        raise HTTPException(status_code=422, detail="Transfer movements must use the approved transfer workflow")
+    facility = db.scalar(select(Facility).where(Facility.id == payload.facility_id, Facility.is_active.is_(True)).with_for_update().execution_options(populate_existing=True))
     medicine = db.scalar(select(Medicine).where(Medicine.id == payload.medicine_id, Medicine.is_active.is_(True)))
     if facility is None:
         raise HTTPException(status_code=404, detail="Facility not found")
@@ -46,7 +53,7 @@ def record_inventory_transaction(
             InventoryBalance.facility_id == payload.facility_id,
             InventoryBalance.medicine_id == payload.medicine_id,
         )
-        .with_for_update()
+        .with_for_update().execution_options(populate_existing=True)
     )
     if balance is None:
         balance = InventoryBalance(
@@ -82,6 +89,10 @@ def record_inventory_transaction(
     )
     balance.quantity_on_hand = new_quantity
     db.add(transaction)
+    db.flush()
+    log_audit_event(db=db, user_id=current_user.id, action="INVENTORY_TRANSACTION_CREATED",
+                    entity_type="inventory_transaction", entity_id=transaction.id, new_state={"transaction_type": transaction.transaction_type.value,
+                    "quantity": str(transaction.quantity), "facility_id": str(transaction.facility_id)})
     db.commit()
     db.refresh(transaction)
     return transaction

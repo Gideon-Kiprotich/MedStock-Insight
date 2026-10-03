@@ -35,6 +35,9 @@ def main():
         )["access_token"]
         client.headers["Authorization"] = "Bearer " + token
         assert call("GET", "/auth/me")["role"]["code"] == "ADMINISTRATOR"
+        call("GET", "/inventory", expected=401, headers={"Authorization": ""})
+        manager = call("POST", "/auth/login", {"email": "daniel.otieno.demo@medstock.example", "password": admin_password})["access_token"]
+        assert call("GET", "/auth/me", headers={"Authorization": "Bearer " + manager})["role"]["code"] == "SUPPLY_CHAIN_MANAGER"
         facilities = {f["code"]: f for f in call("GET", "/facilities?page_size=100")["data"]}
         medicines = call("GET", "/medicines?page_size=100")["data"]
         medicine = next(
@@ -52,6 +55,17 @@ def main():
             return Decimal(rows[0]["quantity_on_hand"])
 
         before_donor, before_dest = balance(donor), balance(dest)
+        def inventory_snapshot():
+            rows = []
+            page = 1
+            while True:
+                result = call("GET", f"/inventory?page_size=200&page={page}")
+                rows.extend((r["facility_id"], r["medicine_id"], r["quantity_on_hand"]) for r in result["data"])
+                if page >= result["pagination"]["total_pages"]:
+                    break
+                page += 1
+            return sorted(rows)
+        initial_inventory = inventory_snapshot()
         forecast = call(
             "POST",
             "/forecasts/generate",
@@ -65,6 +79,7 @@ def main():
             201,
         )
         assert len(forecast["points"]) == 14 and forecast["run"]["data_points_used"] == 730
+        assert inventory_snapshot() == initial_inventory
         call("GET", f"/forecasts/{forecast['run']['id']}/explanation")
         risk = call(
             "POST",
@@ -72,6 +87,7 @@ def main():
             {"facility_id": dest, "medicine_id": mid, "forecast_run_id": forecast["run"]["id"]},
             201,
         )
+        assert inventory_snapshot() == initial_inventory
         call("GET", f"/risk-assessments/{risk['id']}/explanation")
         payload = {
             "destination_facility_id": dest,
@@ -80,6 +96,7 @@ def main():
             "planning_horizon_days": 14,
         }
         rec = call("POST", "/redistributions/recommendations/generate", payload, 201)
+        assert inventory_snapshot() == initial_inventory
         call("GET", f"/redistributions/recommendations/{rec['id']}/explanation")
         officer = call(
             "POST",
@@ -93,22 +110,42 @@ def main():
             403,
             {"Authorization": "Bearer " + officer},
         )
+        for path, protected_payload in [
+            ("/forecasts/generate", {"facility_id":dest,"medicine_id":mid}),
+            ("/risk-assessments/generate", {"facility_id":dest,"medicine_id":mid}),
+            ("/forecast-evaluation/experiments", {}),
+            ("/transfers", {"recommendation_id":rec["id"],"quantity":1}),
+            (f"/redistributions/recommendations/{rec['id']}/reject", {}),
+        ]:
+            call("POST", path, protected_payload, 403, {"Authorization":"Bearer "+officer})
+        call("GET", "/users/demo", expected=403, headers={"Authorization":"Bearer "+officer})
+        client.headers["Authorization"] = "Bearer " + manager
         approved = call(
             "POST",
             f"/redistributions/recommendations/{rec['id']}/approve",
             {"note": "Disposable synthetic E2E approval"},
         )
         assert approved["status"] == "APPROVED"
+        assert inventory_snapshot() == initial_inventory
         transfer = call("POST", "/transfers", {"recommendation_id": rec["id"], "quantity": 5}, 201)
         assert transfer["status"] == "APPROVED"
+        assert inventory_snapshot() == initial_inventory
+        call("POST", f"/transfers/{transfer['id']}/complete", expected=409)
         dispatched = call("POST", f"/transfers/{transfer['id']}/dispatch")
         assert dispatched["status"] == "IN_TRANSIT"
+        assert call("POST", f"/transfers/{transfer['id']}/dispatch")["status"] == "IN_TRANSIT"
+        call("POST", f"/transfers/{transfer['id']}/cancel", {"reason":"Invalid transition check"}, 409)
+        wrong_officer = call("POST", "/auth/login", {"email":"faith.achi.demo@medstock.example","password":officer_password})["access_token"]
+        call("POST", f"/transfers/{transfer['id']}/complete", expected=403, headers={"Authorization":"Bearer "+wrong_officer})
         assert balance(donor) == before_donor - 5 and balance(dest) == before_dest
-        completed = call("POST", f"/transfers/{transfer['id']}/complete")
+        completed = call("POST", f"/transfers/{transfer['id']}/complete", headers={"Authorization":"Bearer "+officer})
         assert completed["status"] == "COMPLETED"
+        call("POST", f"/transfers/{transfer['id']}/cancel", {"reason":"Invalid transition check"}, 409)
+        call("POST", f"/transfers/{transfer['id']}/dispatch", expected=409)
         assert balance(donor) == before_donor - 5 and balance(dest) == before_dest + 5
         assert call("POST", f"/transfers/{transfer['id']}/complete")["status"] == "COMPLETED"
         assert balance(donor) == before_donor - 5 and balance(dest) == before_dest + 5
+        post_transfer_inventory = inventory_snapshot()
         cancellation_rec = call("POST", "/redistributions/recommendations/generate", payload, 201)
         call("POST", f"/redistributions/recommendations/{cancellation_rec['id']}/approve", {})
         cancelled = call(
@@ -131,6 +168,12 @@ def main():
             )["status"]
             == "REJECTED"
         )
+        assert inventory_snapshot() == post_transfer_inventory
+        simulation = call("POST", "/scenarios", {"facility_id":dest,"medicine_id":mid,"demand_adjustment_pct":20,"inventory_adjustment_pct":-20,"lead_time_adjustment_days":7})
+        replay = call("GET", f"/scenarios/{simulation['id']}")
+        assert replay["scenario"] == simulation["scenario"]
+        assert inventory_snapshot() == post_transfer_inventory
+        client.headers["Authorization"] = "Bearer " + token
         # Existing transaction workflow and conservation after a receipt/consumption pair.
         for kind in ["RECEIPT", "CONSUMPTION"]:
             call(
@@ -156,7 +199,11 @@ def main():
                 {
                     "passed": True,
                     "workflow": [
-                        "login",
+                        "login and all canonical roles",
+                        "anonymous and protected-action RBAC",
+                        "invalid transfer transitions",
+                        "assigned receiving officer",
+                        "scenario/replay without ledger mutations",
                         "730-day forecast",
                         "risk/explanations",
                         "RBAC rejection",

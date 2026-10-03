@@ -1,8 +1,9 @@
 import { medicineLabel } from '../utils/labels';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import type {
   Facility,
+  RoleCode,
   Medicine,
   RedistributionRecommendation,
   RedistributionTransfer,
@@ -23,9 +24,12 @@ import {
 
 interface TransferTrackingPageProps {
   initialRecommendationId?: string;
+  userRole?: RoleCode;
+  receivingFacilityId?: string;
 }
 
-export const TransferTrackingPage: React.FC<TransferTrackingPageProps> = ({ initialRecommendationId }) => {
+export const TransferTrackingPage: React.FC<TransferTrackingPageProps> = ({ initialRecommendationId, userRole, receivingFacilityId }) => {
+  const canManage = userRole === 'ADMINISTRATOR' || userRole === 'SUPPLY_CHAIN_MANAGER';
   const [transfers, setTransfers] = useState<RedistributionTransfer[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
@@ -39,6 +43,7 @@ export const TransferTrackingPage: React.FC<TransferTrackingPageProps> = ({ init
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedRecId, setSelectedRecId] = useState(initialRecommendationId || '');
   const [createQty, setCreateQty] = useState<number>(0);
+  const openedRecommendation = useRef<string | undefined>(undefined);
 
   // Cancel modal state
   const [cancelTransferId, setCancelTransferId] = useState<string | null>(null);
@@ -70,7 +75,9 @@ export const TransferTrackingPage: React.FC<TransferTrackingPageProps> = ({ init
   }, [selectedStatus]);
 
   useEffect(() => {
-    if (initialRecommendationId && approvedRecs.length > 0) {
+    if (canManage && initialRecommendationId && !isLoading && openedRecommendation.current !== initialRecommendationId) {
+      openedRecommendation.current = initialRecommendationId;
+      if (transfers.some((transfer) => transfer.recommendation_id === initialRecommendationId && transfer.status !== 'CANCELLED')) return;
       const target = approvedRecs.find((r) => r.id === initialRecommendationId);
       if (target) {
         setSelectedRecId(target.id);
@@ -78,7 +85,7 @@ export const TransferTrackingPage: React.FC<TransferTrackingPageProps> = ({ init
         setShowCreateModal(true);
       }
     }
-  }, [initialRecommendationId, approvedRecs]);
+  }, [canManage, initialRecommendationId, approvedRecs, transfers, isLoading]);
 
   const getFacilityName = (id: string) => facilities.find((f) => f.id === id)?.name || id;
   const getMedicineName = (id: string) => (() => { const medicine = medicines.find((m) => m.id === id); return medicine ? medicineLabel(medicine) : id; })();
@@ -175,7 +182,7 @@ export const TransferTrackingPage: React.FC<TransferTrackingPageProps> = ({ init
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowCreateModal(true)}
+            disabled={!canManage} onClick={() => setShowCreateModal(true)}
             className="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold inline-flex items-center gap-2 shadow-lg shadow-indigo-900/30"
           >
             <Plus className="w-4 h-4" />
@@ -298,7 +305,7 @@ export const TransferTrackingPage: React.FC<TransferTrackingPageProps> = ({ init
 
                   <td className="py-3.5 px-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {tx.status === 'APPROVED' && (
+                      {canManage && tx.status === 'APPROVED' && (
                         <>
                           <button
                             onClick={() => handleDispatch(tx.id)}
@@ -320,7 +327,7 @@ export const TransferTrackingPage: React.FC<TransferTrackingPageProps> = ({ init
                         </>
                       )}
 
-                      {tx.status === 'IN_TRANSIT' && (
+                      {tx.status === 'IN_TRANSIT' && (canManage || (userRole === 'INVENTORY_OFFICER' && tx.destination_facility_id === receivingFacilityId)) && (
                         <button
                           onClick={() => handleComplete(tx.id)}
                           disabled={actionLoading}

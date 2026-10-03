@@ -41,6 +41,7 @@ seeded ledgers are preserved on rerun; no historical backfill or balance reset i
 performed against an existing ledger. Never delete a working database to upgrade.
 
 ```bash
+# Set MEDSTOCK_DEMO_PASSWORD privately before seeding.
 export DATABASE_URL=sqlite:////tmp/medstock-phase10-demo.sqlite
 uv run alembic upgrade head
 uv run python scripts/seed.py --as-of 2026-10-02
@@ -85,9 +86,11 @@ forecasts are disclosed. Feasibility is not transfer authorization or a promise
 that delivery can prevent the earliest breach.
 
 `POST /api/v1/scenarios` stores inputs, parameters, calculation version, dates,
-forecast/model identifiers, results and a SHA-256 input fingerprint in the separate
+forecast/model identifiers, results and a SHA-256 snapshot fingerprint in the separate
 `analytical_experiments` table. `GET /api/v1/scenarios/{id}` replays those saved
-inputs, even if the ledger subsequently changes. The UI labels every comparison
+inputs, even if the ledger subsequently changes. A separate reproducibility
+fingerprint uses stable reference codes and calculation inputs while excluding
+random database IDs; it matches across fresh resets using the same as-of date. The UI labels every comparison
 **SIMULATION — NOT LIVE INVENTORY**. No simulation creates inventory transactions,
 changes balances/forecasts, approves recommendations or executes transfers.
 

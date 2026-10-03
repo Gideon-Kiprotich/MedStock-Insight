@@ -1,10 +1,11 @@
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from alembic import context
 from app.core.config import get_settings
 from app.db.base import Base
+from app.db.migrations import existing_enum_guard
 from app.models import *  # noqa: F401,F403
 
 config = context.config
@@ -30,7 +31,7 @@ def run_migrations_online() -> None:
     )
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata, compare_type=True, render_as_batch=True)
-        with context.begin_transaction():
+        with existing_enum_guard(connection), context.begin_transaction():
             context.run_migrations()
 
 

@@ -6,6 +6,7 @@ import { LoginPage } from '../pages/LoginPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { StockoutRiskPage } from '../pages/StockoutRiskPage';
 import { RedistributionPage } from '../pages/RedistributionPage';
+import { AuditTrailPage } from '../pages/AuditTrailPage';
 import { TransferTrackingPage } from '../pages/TransferTrackingPage';
 import { api, APIClientError } from '../api/client';
 import { AuthProvider } from '../context/AuthContext';
@@ -169,11 +170,43 @@ describe('Phase 7 Frontend Integration Suite', () => {
     const submitButton = screen.getByRole('button', { name: /sign in/i });
 
     fireEvent.change(emailInput, { target: { value: 'grace.njeri.demo@medstock.example' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'test-only-placeholder' } });
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(api.login).toHaveBeenCalledWith({ email: 'grace.njeri.demo@medstock.example', password: 'ChangeMe123!' });
+      expect(api.login).toHaveBeenCalledWith({ email: 'grace.njeri.demo@medstock.example', password: 'test-only-placeholder' });
     });
+  });
+
+  it('retains the login form and error after failed authentication', async () => {
+    vi.mocked(api.login).mockRejectedValueOnce(new Error('Invalid credentials'));
+    render(<App />);
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'test-only-placeholder' } });
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+    await screen.findByText('Invalid credentials');
+    expect(screen.getByLabelText('Password')).toBeInTheDocument();
+  });
+
+  it('does not reopen a dismissed transfer modal when data refreshes', async () => {
+    vi.mocked(api.getRecommendations).mockResolvedValue({data: [{id:'r-target',recommended_quantity:5}] as any, pagination:{} as any});
+    render(<TransferTrackingPage userRole="ADMINISTRATOR" initialRecommendationId="r-target" />);
+    await screen.findByText('Create Physical Transfer');
+    fireEvent.click(screen.getByRole('button', {name:'Cancel', exact:true}));
+    fireEvent.click(screen.getByTitle('Refresh Transfers'));
+    await waitFor(() => expect(api.getTransfers).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByText('Create Physical Transfer')).not.toBeInTheDocument());
+  });
+
+  it('uses backend audit entity codes and reports failures instead of empty results', async () => {
+    vi.mocked(api.getAuditLogs).mockResolvedValue({data:[],pagination:{} as any});
+    render(<AuditTrailPage />);
+    await screen.findByText(/No audit log entries/);
+    fireEvent.change(screen.getAllByRole('combobox')[1], {target:{value:'redistribution_transfer'}});
+    await waitFor(() => expect(api.getAuditLogs).toHaveBeenLastCalledWith({action:undefined,entity_type:'redistribution_transfer'}));
+    vi.mocked(api.getAuditLogs).mockRejectedValueOnce(new Error('Audit request failed'));
+    fireEvent.click(screen.getByTitle('Refresh Audit Logs'));
+    await screen.findByRole('alert');
+    expect(screen.queryByText(/No audit log entries/)).not.toBeInTheDocument();
   });
 
   // 2. Protected routing
@@ -344,7 +377,7 @@ describe('Phase 7 Frontend Integration Suite', () => {
       pagination: {} as any,
     });
 
-    render(<TransferTrackingPage />);
+    render(<TransferTrackingPage userRole="ADMINISTRATOR" />);
 
     await waitFor(() => {
       expect(screen.getAllByText('APPROVED').length).toBeGreaterThan(0);
@@ -374,7 +407,7 @@ describe('Phase 7 Frontend Integration Suite', () => {
       pagination: {} as any,
     });
 
-    render(<TransferTrackingPage />);
+    render(<TransferTrackingPage userRole="ADMINISTRATOR" />);
 
     await waitFor(() => {
       expect(screen.getAllByText('IN TRANSIT').length).toBeGreaterThan(0);
@@ -417,7 +450,7 @@ describe('Phase 7 Frontend Integration Suite', () => {
 
   // 12. Accessibility of key operational controls
   it('12. ensures key operational controls are accessible buttons with visible labels', async () => {
-    render(<TransferTrackingPage />);
+    render(<TransferTrackingPage userRole="ADMINISTRATOR" />);
 
     await waitFor(() => {
       const createButton = screen.getByText('Create Transfer');

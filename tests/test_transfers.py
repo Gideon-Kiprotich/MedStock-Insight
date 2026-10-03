@@ -1,6 +1,6 @@
+import uuid
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-import uuid
 
 import pytest
 from fastapi import HTTPException
@@ -19,13 +19,12 @@ from app.models.core import (
     Medicine,
     RedistributionRecommendation,
     RedistributionRecommendationStatus,
-    RedistributionTransfer,
     RedistributionTransferStatus,
     Role,
     RoleCode,
     User,
 )
-from app.schemas.transfers import TransferCancel, TransferCreate
+from app.schemas.transfers import TransferCreate
 from app.services.redistribution import decide_recommendation
 from app.services.transfer import (
     cancel_transfer,
@@ -373,7 +372,7 @@ def test_failed_completion_invalid_status(db_session: Session, sample_approved_r
 # 10. Stale / Expired recommendation cannot be created or dispatched
 def test_expired_recommendation_rejected(db_session: Session, sample_approved_recommendation):
     scm_user = db_session.scalar(select(User).where(User.email == "scm@test.com"))
-    
+
     # Expire recommendation
     sample_approved_recommendation.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
     db_session.commit()
@@ -390,13 +389,12 @@ def test_expired_recommendation_rejected(db_session: Session, sample_approved_re
 
 # 11. Unauthorized user role checks (service/routing contract verification)
 def test_unauthorized_user_role_handling(db_session: Session, sample_approved_recommendation):
-    from app.api.routes.transfers import create_transfer_endpoint, dispatch_transfer_endpoint
     from app.api.deps import require_roles
-    
+
     # Check that route dependency enforces roles
     dep = require_roles(RoleCode.ADMINISTRATOR, RoleCode.SUPPLY_CHAIN_MANAGER)
     io_user = db_session.scalar(select(User).where(User.email == "io@test.com"))
-    
+
     with pytest.raises(HTTPException) as exc_info:
         dep(current_user=io_user)
     assert exc_info.value.status_code == 403
@@ -405,7 +403,7 @@ def test_unauthorized_user_role_handling(db_session: Session, sample_approved_re
 # 12. Audit records are created for required business events
 def test_audit_log_events_generated(db_session: Session, sample_approved_recommendation):
     scm_user = db_session.scalar(select(User).where(User.email == "scm@test.com"))
-    
+
     # Approve recommendation audit check
     now = datetime.now(timezone.utc)
     rec_pending = RedistributionRecommendation(
@@ -445,3 +443,25 @@ def test_audit_log_events_generated(db_session: Session, sample_approved_recomme
     assert "INVENTORY_TRANSFER_OUT" in audit_actions
     assert "TRANSFER_COMPLETED" in audit_actions
     assert "INVENTORY_TRANSFER_IN" in audit_actions
+
+
+def test_expired_batch_is_rejected_before_creation_and_dispatch(db_session, sample_approved_recommendation):
+    actor = db_session.scalar(select(User).where(User.email == "scm@test.com"))
+    batch = db_session.scalar(select(Batch))
+    batch.expiry_date = date.today() - timedelta(days=1)
+    db_session.commit()
+    payload = TransferCreate(recommendation_id=sample_approved_recommendation.id, batch_id=batch.id, quantity=5)
+    with pytest.raises(HTTPException) as error:
+        create_transfer(db_session, payload, actor)
+    assert error.value.status_code == 409
+    batch.expiry_date = date.today() + timedelta(days=1)
+    db_session.commit()
+    transfer = create_transfer(db_session, payload, actor)
+    batch.expiry_date = date.today() - timedelta(days=1)
+    db_session.commit()
+    before = db_session.scalar(select(InventoryBalance).where(InventoryBalance.facility_id == transfer.source_facility_id)).quantity_on_hand
+    with pytest.raises(HTTPException) as error:
+        dispatch_transfer(db_session, transfer.id, actor)
+    assert error.value.status_code == 409
+    assert db_session.scalars(select(InventoryTransaction)).all() == []
+    assert db_session.scalar(select(InventoryBalance).where(InventoryBalance.facility_id == transfer.source_facility_id)).quantity_on_hand == before

@@ -2,12 +2,11 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import case, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, aliased
 
 from app.models.core import (
     Facility,
-    InventoryBalance,
     Medicine,
     RedistributionRecommendation,
     RedistributionRecommendationStatus,

@@ -402,8 +402,8 @@ export const ForecastsPage: React.FC = () => {
                   <label className="block text-xs font-medium text-slate-700 mb-1">Lookback (Days)</label>
                   <input
                     type="number"
-                    min={7}
-                    max={365}
+                    min={14}
+                    max={730}
                     value={genLookback}
                     onChange={(e) => setGenLookback(Number(e.target.value))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"

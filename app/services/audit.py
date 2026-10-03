@@ -16,7 +16,7 @@ def log_audit_event(
     new_state: dict[str, Any] | None = None,
     details: dict[str, Any] | None = None,
 ) -> AuditLog:
-    """Creates an immutable audit log entry within the current database session."""
+    """Appends an audit event within the current transaction; storage is not tamper-proof."""
     log_entry = AuditLog(
         user_id=user_id,
         action=action,

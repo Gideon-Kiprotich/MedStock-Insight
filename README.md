@@ -24,15 +24,17 @@ Facility identities are sourced from KMHFR and medicine formulations from KEML 2
 ## Run locally
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 # Windows: .venv\\Scripts\\activate
 # Linux/macOS: source .venv/bin/activate
 
 pip install -e ".[dev]"
+cp .env.example .env
+# Fill local database credentials, POSTGRES_PASSWORD and MEDSTOCK_DEMO_PASSWORD.
 
 docker compose up -d
 alembic upgrade head
-python scripts/seed.py
+uv run --env-file .env python scripts/seed.py
 uvicorn app.main:app --reload
 ```
 
@@ -41,9 +43,9 @@ Open `http://127.0.0.1:8000/docs` for the OpenAPI UI.
 Demo login:
 
 - email: `grace.njeri.demo@medstock.example`
-- password: `ChangeMe123!`
+- password: the local `MEDSTOCK_DEMO_PASSWORD` supplied when seeding
 
-The account and password are for a local demonstration only. Never connect this seed to live facility operations.
+Set a non-production `MEDSTOCK_DEMO_PASSWORD` (at least 12 characters) before seeding; enter it manually on Login. The accounts are synthetic and for a local demonstration only. Never connect this seed to live facility operations.
 
 Run `python scripts/data_quality_report.py` after seeding for measured coverage and synthetic activity counts. The seed is idempotent; use a separate empty database for a fresh simulation. See `docs/kenya-data.md` for sources and modelling assumptions.
 
@@ -172,3 +174,20 @@ fresh two-year seeding, evaluation commands, simulation isolation and coverage
 limits. Apply the new migration with `uv run alembic upgrade head` before starting
 the API. Existing seeded ledgers are preserved; use a separate empty disposable
 database to generate the longer history.
+
+## Local hardening configuration
+
+Use a private ignored `.env` for `DATABASE_URL`, `POSTGRES_PASSWORD` and a generated
+`JWT_SECRET_KEY`. Generate a key locally with
+`uv run python -c "import secrets; print(secrets.token_urlsafe(48))"`; never paste it into
+source control. Set a separate non-production `MEDSTOCK_DEMO_PASSWORD` before
+seeding an empty disposable database. PostgreSQL is bound to loopback by default.
+Debug defaults to false and wildcard CORS is rejected. When no signing key is
+supplied in a local development/test environment, the ephemeral key invalidates
+tokens on restart; use one configured key for multiple workers.
+
+JWT tokens remain in browser `localStorage`: this is **not secure storage** and is
+exposed to script access/XSS. Backend authentication, canonical roles and receiving
+facility checks remain authoritative. General transaction entry cannot bypass the
+transfer approval/dispatch/receipt workflow. Never use these synthetic accounts
+against live operations. See [Phase 11 verification](docs/phase11_hardening.md).

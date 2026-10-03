@@ -20,18 +20,18 @@ import { Sidebar } from './components/layout/Sidebar';
 import { DemonstrationBanner } from './components/common/DemonstrationBanner';
 
 const MainApp: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user, token } = useAuth();
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [selectedMedicineId, setSelectedMedicineId] = useState<string | null>(null);
   const [transferTargetRecId, setTransferTargetRecId] = useState<string | undefined>(undefined);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  if (isLoading) {
+  if (isLoading && token) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
         <div className="text-center space-y-3">
           <div className="w-10 h-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs text-slate-400 font-medium">Initializing MedStock Insight Authority Shell...</p>
+          <p className="text-xs text-slate-400 font-medium">Loading MedStock Insight...</p>
         </div>
       </div>
     );
@@ -99,7 +99,7 @@ const MainApp: React.FC = () => {
           )}
 
           {currentTab === 'transfers' && (
-            <TransferTrackingPage initialRecommendationId={transferTargetRecId} />
+            <TransferTrackingPage initialRecommendationId={transferTargetRecId} userRole={user?.role.code} receivingFacilityId={user?.facility_id || undefined} />
           )}
 
           {currentTab === 'facilities' && <FacilitiesPage />}
@@ -129,10 +129,15 @@ const MainApp: React.FC = () => {
   );
 };
 
+const SessionApp: React.FC = () => {
+  const { user, isAuthenticated } = useAuth();
+  return <MainApp key={isAuthenticated ? user?.id : 'anonymous'} />;
+};
+
 export function App() {
   return (
     <AuthProvider>
-      <MainApp />
+      <SessionApp />
     </AuthProvider>
   );
 }

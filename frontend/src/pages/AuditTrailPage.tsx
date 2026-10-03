@@ -9,17 +9,19 @@ export const AuditTrailPage: React.FC = () => {
   const [actionFilter, setActionFilter] = useState('');
   const [entityFilter, setEntityFilter] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadLogs = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const res = await api.getAuditLogs({
         action: actionFilter || undefined,
         entity_type: entityFilter || undefined,
       });
       setLogs(res.data);
-    } catch {
-      // Ignored
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to load audit events. Retry the request.');
     } finally {
       setIsLoading(false);
     }
@@ -44,11 +46,11 @@ export const AuditTrailPage: React.FC = () => {
 
   return (
     <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5">
             <History className="w-6 h-6 text-blue-700" />
-            <span>Immutable Audit Trail</span>
+            <span>Demonstration Audit Trail</span>
           </h2>
           <p className="text-xs text-slate-500 mt-1">
             Demonstration audit log of synthetic decisions and inventory state changes
@@ -63,7 +65,7 @@ export const AuditTrailPage: React.FC = () => {
           >
             <RefreshCw className="w-4 h-4" />
           </button>
-          <DataBadge type="CONFIRMED" label="IMMUTABLE AUDIT LEDGER" />
+          <DataBadge type="CONFIRMED" label="RECORDED DEMO EVENTS" />
         </div>
       </div>
 
@@ -71,12 +73,12 @@ export const AuditTrailPage: React.FC = () => {
       <div className="p-3.5 rounded-xl bg-white border border-slate-200 text-slate-500 text-xs flex items-center gap-3">
         <Lock className="w-4 h-4 text-blue-700 shrink-0" />
         <span>
-          This log is read-only and immutable. Entries are permanently recorded by the system for statutory compliance and supply chain transparency. Edit/delete operations are disallowed.
+          Application audit events are read-only through this interface. Database administrators can change stored records; this prototype does not provide tamper-proof storage or establish statutory compliance.
         </span>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="flex items-center gap-4 p-4 rounded-xl bg-white border border-slate-200 text-xs">
+      <div className="flex flex-wrap items-center gap-4 p-4 rounded-xl bg-white border border-slate-200 text-xs">
         <div className="flex items-center gap-2 font-semibold text-slate-500">
           <Filter className="w-4 h-4 text-blue-700" />
           <span>Filters:</span>
@@ -94,7 +96,9 @@ export const AuditTrailPage: React.FC = () => {
           <option value="TRANSFER_DISPATCHED">TRANSFER_DISPATCHED</option>
           <option value="TRANSFER_COMPLETED">TRANSFER_COMPLETED</option>
           <option value="TRANSFER_CANCELLED">TRANSFER_CANCELLED</option>
-          <option value="INVENTORY_TRANSACTION_RECORDED">INVENTORY_TRANSACTION_RECORDED</option>
+          <option value="INVENTORY_TRANSFER_OUT">INVENTORY_TRANSFER_OUT</option>
+          <option value="INVENTORY_TRANSFER_IN">INVENTORY_TRANSFER_IN</option>
+          <option value="INVENTORY_TRANSACTION_CREATED">INVENTORY_TRANSACTION_CREATED</option>
         </select>
 
         <select
@@ -103,16 +107,18 @@ export const AuditTrailPage: React.FC = () => {
           className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-slate-900 focus:outline-none focus:border-indigo-500"
         >
           <option value="">All Entity Types</option>
-          <option value="RedistributionRecommendation">RedistributionRecommendation</option>
-          <option value="RedistributionTransfer">RedistributionTransfer</option>
-          <option value="InventoryTransaction">InventoryTransaction</option>
+          <option value="redistribution_recommendation">RedistributionRecommendation</option>
+          <option value="redistribution_transfer">RedistributionTransfer</option>
+          <option value="inventory_transaction">InventoryTransaction</option>
         </select>
       </div>
+
+      {error && <div role="alert" className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>}
 
       {/* Audit Table */}
       {isLoading ? (
         <div className="p-8 text-center text-slate-500 text-xs">Loading audit ledger...</div>
-      ) : logs.length === 0 ? (
+      ) : error ? null : logs.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-xl border border-slate-200 text-slate-500 text-xs">
           No audit log entries match the selected filter criteria.
         </div>

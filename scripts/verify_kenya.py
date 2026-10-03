@@ -1,6 +1,7 @@
 """Integration checks for a disposable seeded Kenya demonstration database."""
 from __future__ import annotations
 
+import os
 import sys
 from collections import defaultdict
 from decimal import Decimal
@@ -79,7 +80,7 @@ def main():
         assert oxytocin_rec.source_projected_end_inventory - oxytocin_rec.recommended_quantity >= oxytocin_rec.source_safety_stock
     with TestClient(app) as client:
         response = client.post("/api/v1/auth/login", json={
-            "email": "grace.njeri.demo@medstock.example", "password": "ChangeMe123!"})
+            "email": "grace.njeri.demo@medstock.example", "password": os.environ["MEDSTOCK_DEMO_PASSWORD"]})
         assert response.status_code == 200, response.text
         headers = {"Authorization": "Bearer " + response.json()["access_token"]}
         facility_response = client.get("/api/v1/facilities?page_size=100", headers=headers)
@@ -94,7 +95,7 @@ def main():
         assert dashboard_response.json()["summary"]["facilities_count"] == 9
         assert users_response.status_code == 200 and len(users_response.json()) == 6
         assert all(person["is_demo_user"] and person["facility_name"] and "password" not in person for person in users_response.json())
-        officer_login = client.post("/api/v1/auth/login", json={"email": "miriam.wanjiku.demo@medstock.example", "password": "ChangeMe123!"})
+        officer_login = client.post("/api/v1/auth/login", json={"email": "miriam.wanjiku.demo@medstock.example", "password": os.environ["MEDSTOCK_DEMO_PASSWORD"]})
         assert officer_login.status_code == 200
         officer_headers = {"Authorization": "Bearer " + officer_login.json()["access_token"]}
         assert client.get("/api/v1/users/demo", headers=officer_headers).status_code == 403

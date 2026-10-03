@@ -39,7 +39,7 @@ def list_inventory(
     count_query = select(func.count()).select_from(InventoryBalance).where(*filters)
     total = db.scalar(count_query) or 0
     items = db.scalars(
-        select(InventoryBalance).where(*filters).order_by(InventoryBalance.updated_at.desc())
+        select(InventoryBalance).where(*filters).order_by(InventoryBalance.updated_at.desc(), InventoryBalance.id)
         .offset((page - 1) * page_size).limit(page_size)
     ).all()
     return CollectionResponse(
@@ -68,7 +68,7 @@ def list_transactions(
     total = db.scalar(select(func.count()).select_from(InventoryTransaction).where(*filters)) or 0
     items = db.scalars(
         select(InventoryTransaction).where(*filters)
-        .order_by(InventoryTransaction.transaction_date.desc(), InventoryTransaction.created_at.desc())
+        .order_by(InventoryTransaction.transaction_date.desc(), InventoryTransaction.created_at.desc(), InventoryTransaction.id)
         .offset((page - 1) * page_size).limit(page_size)
     ).all()
     return CollectionResponse(

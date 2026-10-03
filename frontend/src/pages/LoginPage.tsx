@@ -5,7 +5,7 @@ import { Activity, Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
 export const LoginPage: React.FC = () => {
   const { login, isLoading } = useAuth();
   const [email, setEmail] = useState('grace.njeri.demo@medstock.example');
-  const [password, setPassword] = useState('ChangeMe123!');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,6 +48,7 @@ export const LoginPage: React.FC = () => {
                 <input
                   id="login-email"
                   type="email"
+                  autoComplete="username"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -64,6 +65,7 @@ export const LoginPage: React.FC = () => {
                 <input
                   id="login-password"
                   type="password"
+                  autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -92,7 +94,7 @@ export const LoginPage: React.FC = () => {
           <div className="mt-7 pt-5 border-t border-slate-200 text-xs text-slate-500">
             <p className="font-semibold text-slate-700 mb-1">Demonstration access</p>
             <p>Grace Njeri — Systems Administrator (synthetic)</p>
-            <p>grace.njeri.demo@medstock.example / ChangeMe123!</p>
+            <p>Use the local demonstration password supplied when seeding.</p>
           </div>
         </div>
         <p className="mt-5 text-center text-xs text-slate-500">DEMONSTRATION ENVIRONMENT — Data shown is simulated and does not represent live facility inventory.</p>

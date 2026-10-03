@@ -1,4 +1,6 @@
-# Kenya/Nairobi Data Quality Report
+# Historical Kenya/Nairobi Data Quality Report
+
+This is the retained Phase 8 measurement, not current Phase 11 coverage. See [current hardening verification](phase11_hardening.md).
 
 Measured against an isolated SQLite database after migration and idempotent seed on 2026-09-30. This is a Kenya/Nairobi real-world reference dataset with synthetic operational data.
 

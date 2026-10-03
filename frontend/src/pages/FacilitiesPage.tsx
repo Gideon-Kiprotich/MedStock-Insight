@@ -69,13 +69,14 @@ export const FacilitiesPage: React.FC = () => {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-100 text-blue-700 font-bold">
-                    {fac.code}
+                    {fac.kmhfr_code ? `KMHFR ${fac.kmhfr_code}` : `Project code ${fac.code}`}
                   </span>
                   <span className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded border ${fac.is_active ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-slate-600 bg-slate-100 border-slate-200'}`}>
-                    <CheckCircle2 className="w-3 h-3" /> {fac.is_active ? 'ACTIVE' : 'INACTIVE'}
+                    <CheckCircle2 className="w-3 h-3" /> {fac.is_active ? 'CATALOGUE ACTIVE' : 'ARCHIVED'}
                   </span>
                 </div>
 
+                <p className="text-[11px] text-slate-500 mb-2">Reference snapshot: {fac.retrieved_at ? new Date(fac.retrieved_at).toLocaleDateString() : 'Date unverified'}</p>
                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                   <Building2 className="w-4 h-4 text-slate-500" />
                   <span>{fac.display_name || fac.name}</span>

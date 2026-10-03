@@ -97,7 +97,7 @@ export const InventoryPage: React.FC = () => {
   return (
     <div className="p-8 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap gap-3 items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Synthetic Inventory Balances & Ledger</h2>
           <p className="text-xs text-slate-500 mt-1">
@@ -105,7 +105,7 @@ export const InventoryPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {canRecordTx && (
             <button
               onClick={() => setShowTxModal(true)}
@@ -130,7 +130,7 @@ export const InventoryPage: React.FC = () => {
       )}
 
       {/* Filter & View Switcher Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-white border border-slate-200">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 p-4 rounded-xl bg-white border border-slate-200">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveTab('balances')}
@@ -157,12 +157,12 @@ export const InventoryPage: React.FC = () => {
           </button>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Filter className="w-4 h-4 text-slate-500" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0 flex-1">
+          <Filter className="hidden" />
           <select
             value={selectedFacility}
             onChange={(e) => setSelectedFacility(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-500"
+            className="w-full min-w-0 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-500"
           >
             <option value="">All Facilities</option>
             {facilities.map((f) => (
@@ -173,7 +173,7 @@ export const InventoryPage: React.FC = () => {
           <select
             value={selectedMedicine}
             onChange={(e) => setSelectedMedicine(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-500"
+            className="w-full min-w-0 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-500"
           >
             <option value="">All Medicines</option>
             {medicines.map((m) => (

@@ -4,3 +4,12 @@ __pycache__/
 .ruff_cache/
 .env
 *.pyc
+
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+*.db-*
+*.sqlite-*
+node_modules/

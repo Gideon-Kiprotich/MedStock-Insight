@@ -6,15 +6,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, model_validator
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
-from app.models.core import AnalyticalExperiment, User
+from app.models.core import AnalyticalExperiment, RoleCode, User
 from app.services.analytics import evaluate_network, latest_evaluation, operational_summary
 from app.services.experiments import ScenarioParameters, create_scenario, serialize, simulate
 
 router = APIRouter(tags=["Decision Analytics"])
 DB = Annotated[Session, Depends(get_db)]
 Actor = Annotated[User, Depends(get_current_user)]
+Evaluator = Annotated[User, Depends(require_roles(RoleCode.ADMINISTRATOR, RoleCode.SUPPLY_CHAIN_MANAGER))]
 
 
 class EvaluationParameters(BaseModel):
@@ -48,7 +49,7 @@ def scenario_replay(scenario_id: UUID, db: DB, _: Actor):
 
 
 @router.post("/forecast-evaluation/experiments")
-def evaluation_create(params: EvaluationParameters, db: DB, actor: Actor):
+def evaluation_create(params: EvaluationParameters, db: DB, actor: Evaluator):
     end = params.end_date or date.today()
     if params.start_date and not 0 <= (end - params.start_date).days <= 730:
         raise HTTPException(422, "Evaluation range must be 1–731 days")
