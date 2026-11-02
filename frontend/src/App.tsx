@@ -14,7 +14,8 @@ import { ForecastsPage } from './pages/ForecastsPage';
 import { FacilitiesPage } from './pages/FacilitiesPage';
 import { UsersPage } from './pages/UsersPage';
 import { AuditTrailPage } from './pages/AuditTrailPage';
-import { PlaceholderPage } from './pages/PlaceholderPage';
+import { ConsumptionLogPage } from './pages/ConsumptionLogPage';
+import { SystemSettingsPage } from './pages/SystemSettingsPage';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { DemonstrationBanner } from './components/common/DemonstrationBanner';
@@ -106,23 +107,13 @@ const MainApp: React.FC = () => {
 
           {currentTab === 'audit' && <AuditTrailPage />}
 
-          {currentTab === 'consumption' && (
-            <PlaceholderPage
-              title="Consumption Logging"
-              description="Historical consumption logging and dispensing ledger module. Facility transaction records are accessible under the Inventory workspace."
-            />
-          )}
+          {currentTab === 'consumption' && <ConsumptionLogPage />}
 
           {currentTab === 'reports' && <DecisionAnalyticsPage />}
 
           {currentTab === 'users' && <UsersPage />}
 
-          {currentTab === 'settings' && (
-            <PlaceholderPage
-              title="System Settings"
-              description="Global environment policies, security keys, and database connectivity settings."
-            />
-          )}
+          {currentTab === 'settings' && <SystemSettingsPage />}
         </main>
       </div>
     </div>

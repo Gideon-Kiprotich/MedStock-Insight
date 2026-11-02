@@ -8,6 +8,7 @@ from decimal import Decimal
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Float,
@@ -532,3 +533,31 @@ class AnalyticalExperiment(Base):
     context: Mapped[dict] = mapped_column(JSON)
     result: Mapped[dict] = mapped_column(JSON)
     fingerprint: Mapped[str] = mapped_column(String(64))
+
+
+class SystemSetting(Base):
+    """Singleton application policy row; never stores credentials or secrets."""
+
+    __tablename__ = "system_settings"
+    __table_args__ = (
+        CheckConstraint(
+            "forecast_default_horizon_days IN (7, 14, 30)",
+            name="ck_system_settings_forecast_horizon",
+        ),
+        CheckConstraint(
+            "reporting_default_days IN (7, 30, 90)",
+            name="ck_system_settings_reporting_days",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    forecast_default_horizon_days: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    reporting_default_days: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    updater: Mapped[User | None] = relationship()

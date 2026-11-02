@@ -40,7 +40,7 @@ export const ForecastsPage: React.FC = () => {
   const [genFacilityId, setGenFacilityId] = useState('');
   const [genMedicineId, setGenMedicineId] = useState('');
   const [genModelCode, setGenModelCode] = useState('MOVING_AVERAGE_7D');
-  const [genHorizon, setGenHorizon] = useState(14);
+  const [genHorizon, setGenHorizon] = useState(30);
   const [genLookback, setGenLookback] = useState(90);
 
   const canGenerate =
@@ -50,16 +50,18 @@ export const ForecastsPage: React.FC = () => {
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const [facRes, medRes, runRes, modelRes] = await Promise.all([
+      const [facRes, medRes, runRes, modelRes, settingRes] = await Promise.all([
         api.getFacilities(),
         api.getMedicines(),
         api.getForecastRuns(),
         api.getModels(),
+        api.getSettings().catch(() => null),
       ]);
       setFacilities(facRes.data);
       setMedicines(medRes.data);
       setRuns(runRes.data);
       setModels(modelRes);
+      if (settingRes) setGenHorizon(settingRes.forecast_default_horizon_days);
       if (runRes.data.length > 0 && !selectedRun) {
         const summary = await api.getForecastSummary(runRes.data[0].id);
         setSelectedRun(summary);

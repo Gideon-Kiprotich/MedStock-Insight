@@ -8,8 +8,9 @@ from statistics import mean, pstdev
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.core import (
     Facility,
@@ -35,6 +36,17 @@ class ForecastResult:
     mae: float | None
 
 
+ANALYTICS_EXCLUDED_REFERENCE_PREFIX = "QA-"
+
+
+def analysis_transaction_filter() -> ColumnElement[bool]:
+    """Keep verification movements in the ledger while excluding them from analytics."""
+    return or_(
+        InventoryTransaction.reference_number.is_(None),
+        InventoryTransaction.reference_number.not_ilike(f"{ANALYTICS_EXCLUDED_REFERENCE_PREFIX}%"),
+    )
+
+
 def build_daily_consumption(
     db: Session,
     facility_id: UUID,
@@ -48,6 +60,7 @@ def build_daily_consumption(
             InventoryTransaction.facility_id == facility_id,
             InventoryTransaction.medicine_id == medicine_id,
             InventoryTransaction.transaction_type == InventoryTransactionType.CONSUMPTION,
+            analysis_transaction_filter(),
             InventoryTransaction.transaction_date >= start_date,
             InventoryTransaction.transaction_date <= end_date,
         )

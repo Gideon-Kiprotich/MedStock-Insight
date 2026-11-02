@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import (
     audit,
     auth,
+    consumption,
     dashboard,
     decision_support,
     experiments,
@@ -14,6 +15,7 @@ from app.api.routes import (
     models,
     redistributions,
     risk,
+    system_settings,
     transfers,
     users,
 )
@@ -42,6 +44,8 @@ app.include_router(risk.router, prefix="/api/v1")
 app.include_router(redistributions.router, prefix="/api/v1")
 app.include_router(transfers.router, prefix="/api/v1")
 app.include_router(audit.router, prefix="/api/v1")
+app.include_router(consumption.router, prefix="/api/v1")
+app.include_router(system_settings.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(decision_support.router, prefix="/api/v1")
 app.include_router(experiments.router, prefix="/api/v1")

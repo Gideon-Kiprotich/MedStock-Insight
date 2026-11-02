@@ -26,7 +26,11 @@ from app.models.core import (
     RiskAssessment,
 )
 from app.services.experiments import capture_position, position_result, save_experiment, serialize
-from app.services.forecasting import build_daily_consumption, evaluate_series
+from app.services.forecasting import (
+    analysis_transaction_filter,
+    build_daily_consumption,
+    evaluate_series,
+)
 
 
 def aggregate_rows(rows: list[dict]) -> list[dict]:
@@ -66,6 +70,7 @@ def evaluate_network(
         )
         .where(
             InventoryTransaction.transaction_type == InventoryTransactionType.CONSUMPTION,
+            analysis_transaction_filter(),
             InventoryTransaction.transaction_date >= start,
             InventoryTransaction.transaction_date <= end,
         )

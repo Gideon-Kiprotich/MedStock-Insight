@@ -13,6 +13,7 @@ from app.db.session import SessionLocal
 from app.models.core import Facility, InventoryTransaction, InventoryTransactionType, Medicine
 from app.services.analytics import evaluate_network, operational_summary
 from app.services.experiments import ScenarioParameters, create_scenario
+from app.services.forecasting import analysis_transaction_filter
 
 
 def main():
@@ -47,7 +48,10 @@ def main():
             func.min(InventoryTransaction.transaction_date),
             func.max(InventoryTransaction.transaction_date),
             func.count(),
-        ).where(InventoryTransaction.transaction_type == InventoryTransactionType.CONSUMPTION)
+        ).where(
+            InventoryTransaction.transaction_type == InventoryTransactionType.CONSUMPTION,
+            analysis_transaction_filter(),
+        )
         first, last, count = db.execute(query).one()
         events = db.scalar(
             select(func.count())

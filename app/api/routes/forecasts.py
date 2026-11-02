@@ -16,6 +16,7 @@ from app.schemas.forecasts import (
     ForecastSummaryResponse,
 )
 from app.services.forecasting import generate_forecast
+from app.services.system_settings import get_forecast_default_horizon
 
 router = APIRouter(prefix="/forecasts", tags=["Forecasts"])
 
@@ -31,7 +32,7 @@ def create_forecast(
         facility_id=payload.facility_id,
         medicine_id=payload.medicine_id,
         model_code=payload.model_code,
-        horizon_days=payload.horizon_days,
+        horizon_days=payload.horizon_days or get_forecast_default_horizon(db),
         lookback_days=payload.lookback_days,
     )
     points = db.scalars(

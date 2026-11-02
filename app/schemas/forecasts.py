@@ -12,7 +12,7 @@ class ForecastGenerateRequest(BaseModel):
     facility_id: UUID
     medicine_id: UUID
     model_code: ForecastModelCode = ForecastModelCode.RANDOM_FOREST
-    horizon_days: int = Field(default=30, ge=1, le=90)
+    horizon_days: int | None = Field(default=None, ge=1, le=90)
     lookback_days: int = Field(default=90, ge=14, le=730)
 
 

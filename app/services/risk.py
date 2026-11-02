@@ -25,6 +25,9 @@ from app.models.core import (
 )
 
 CALCULATION_VERSION = "1.0"
+CRITICAL_BREACH_DAYS = 5
+HIGH_BREACH_DAYS = 10
+MEDIUM_BREACH_DAYS = 15
 
 
 @dataclass(frozen=True)
@@ -40,11 +43,15 @@ class RiskCalculation:
 
 
 def classify_risk(days_to_breach: int | None, currently_out_of_stock: bool) -> RiskLevel:
-    if currently_out_of_stock or days_to_breach is not None and days_to_breach <= 5:
+    if (
+        currently_out_of_stock
+        or days_to_breach is not None
+        and days_to_breach <= CRITICAL_BREACH_DAYS
+    ):
         return RiskLevel.CRITICAL
-    if days_to_breach is not None and days_to_breach <= 10:
+    if days_to_breach is not None and days_to_breach <= HIGH_BREACH_DAYS:
         return RiskLevel.HIGH
-    if days_to_breach is not None and days_to_breach <= 15:
+    if days_to_breach is not None and days_to_breach <= MEDIUM_BREACH_DAYS:
         return RiskLevel.MEDIUM
     return RiskLevel.LOW
 

@@ -64,11 +64,26 @@ def get_dashboard_read_model(
     if risk_level:
         risk_filters.append(RiskAssessment.risk_level == risk_level)
 
+    latest_risk = (
+        select(
+            RiskAssessment.id.label("risk_id"),
+            func.row_number().over(
+                partition_by=(RiskAssessment.facility_id, RiskAssessment.medicine_id),
+                order_by=(RiskAssessment.assessed_at.desc(), RiskAssessment.id.desc()),
+            ).label("row_number"),
+        ).subquery()
+    )
     risk_stmt = (
         select(RiskAssessment, Facility, Medicine)
+        .join(latest_risk, latest_risk.c.risk_id == RiskAssessment.id)
         .join(Facility, RiskAssessment.facility_id == Facility.id)
         .join(Medicine, RiskAssessment.medicine_id == Medicine.id)
-        .where(Facility.is_active.is_(True), Medicine.is_active.is_(True), *risk_filters)
+        .where(
+            latest_risk.c.row_number == 1,
+            Facility.is_active.is_(True),
+            Medicine.is_active.is_(True),
+            *risk_filters,
+        )
     )
     risk_rows = db.execute(risk_stmt).all()
 

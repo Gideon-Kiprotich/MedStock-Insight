@@ -2,6 +2,7 @@ import type { ScenarioParameters, ScenarioResult, AggregateEvaluation, DecisionA
 import type {
   AuditLog,
   CollectionResponse,
+  ConsumptionResponse,
   DashboardResponse,
   DemoUser,
   Facility,
@@ -18,6 +19,7 @@ import type {
   RedistributionRecommendation,
   RedistributionTransfer,
   RiskAssessment,
+  SystemSettings,
   TokenResponse,
   User,
 } from '../types/api';
@@ -203,6 +205,35 @@ export const api = {
     notes?: string;
   }) =>
     request<InventoryTransaction>('/inventory/transactions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getConsumptionLog: (params?: {
+    facility_id?: string;
+    medicine_id?: string;
+    start_date?: string;
+    end_date?: string;
+    search?: string;
+    sort_by?: string;
+    sort_order?: string;
+    page?: number;
+    page_size?: number;
+  }) => {
+    const query = new URLSearchParams();
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== '') query.set(key, String(value));
+    });
+    return request<ConsumptionResponse>(`/consumption?${query.toString()}`);
+  },
+
+  // System Settings
+  getSettings: () => request<SystemSettings>('/settings'),
+  updateSettings: (data: {
+    forecast_default_horizon_days: 7 | 14 | 30;
+    reporting_default_days: 7 | 30 | 90;
+  }) =>
+    request<SystemSettings>('/settings', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

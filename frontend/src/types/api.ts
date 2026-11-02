@@ -270,7 +270,10 @@ export interface MLModelVersion {
   name: string;
   algorithm: string;
   version: string;
+  hyperparameters?: Record<string, unknown>;
+  evaluation_metrics?: Record<string, unknown>;
   is_active: boolean;
+  created_at?: string;
 }
 
 export interface RiskAssessment {
@@ -447,6 +450,63 @@ export interface CollectionResponse<T> {
     total: number;
     total_pages: number;
   };
+}
+
+export interface ConsumptionEntry {
+  id: string;
+  facility_id: string;
+  facility_name: string;
+  medicine_id: string;
+  medicine_name: string;
+  unit_of_measure: string;
+  quantity: number;
+  transaction_date: string;
+  reference_number?: string;
+  notes?: string;
+  recorded_by: string;
+  recorded_by_name: string;
+  created_at: string;
+}
+
+export interface ConsumptionSummary {
+  total_quantity: number;
+  transaction_count: number;
+  distinct_medicines: number;
+  days_covered: number;
+  daily_average: number;
+  first_date?: string;
+  last_date?: string;
+}
+
+export interface ConsumptionTrendPoint {
+  date: string;
+  quantity: number;
+  transaction_count: number;
+}
+
+export interface ConsumptionResponse extends CollectionResponse<ConsumptionEntry> {
+  summary: ConsumptionSummary;
+  trend: ConsumptionTrendPoint[];
+}
+
+export interface StockoutThresholds {
+  critical_days: number;
+  high_days: number;
+  medium_days: number;
+  out_of_stock_is_critical: boolean;
+}
+
+export interface SystemSettings {
+  application_name: string;
+  application_version: string;
+  environment: string;
+  forecast_default_horizon_days: 7 | 14 | 30;
+  reporting_default_days: 7 | 30 | 90;
+  timezone: string;
+  stockout_thresholds: StockoutThresholds;
+  updated_at?: string;
+  updated_by?: string;
+  updated_by_name?: string;
 }
 
 export interface APIError {

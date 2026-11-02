@@ -27,6 +27,7 @@ from app.services.forecasting import (
     FEATURE_NAMES,
     HOLDOUT_DAYS,
     MIN_TRAIN_DAYS,
+    analysis_transaction_filter,
     build_daily_consumption,
     evaluate_series,
 )
@@ -51,6 +52,7 @@ def forecast_evaluation(
     if end < start or (end - start).days > 730:
         raise HTTPException(status_code=422, detail="Evaluation date range must be 1–731 days")
     filters = [InventoryTransaction.transaction_type == InventoryTransactionType.CONSUMPTION,
+               analysis_transaction_filter(),
                InventoryTransaction.transaction_date >= start,
                InventoryTransaction.transaction_date <= end]
     if facility_id:

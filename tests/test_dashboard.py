@@ -232,3 +232,41 @@ def test_dashboard_queries_are_read_only(db_session: Session):
     stock_after = {b.id: b.quantity_on_hand for b in bal_after}
 
     assert stock_before == stock_after
+
+
+def test_dashboard_uses_only_latest_risk_assessment_per_pair(db_session: Session):
+    facility = db_session.scalar(select(Facility).where(Facility.code == "FAC-A"))
+    medicine = db_session.scalar(select(Medicine).where(Medicine.code == "MED-01"))
+    run = db_session.scalar(select(ForecastRun).where(ForecastRun.facility_id == facility.id))
+    later = datetime.now(timezone.utc) + timedelta(minutes=5)
+    db_session.add(
+        RiskAssessment(
+            facility_id=facility.id,
+            medicine_id=medicine.id,
+            forecast_run_id=run.id,
+            assessed_at=later,
+            risk_level=RiskLevel.MEDIUM,
+            currently_out_of_stock=False,
+            days_to_breach=12,
+            inventory_on_hand=Decimal("45.00"),
+            safety_stock=Decimal("100.00"),
+            reorder_point=Decimal("200.00"),
+            forecast_horizon_days=14,
+            calculation_version="risk-1.0",
+        )
+    )
+    db_session.commit()
+
+    model = get_dashboard_read_model(db_session)
+    pair_rows = [
+        item for item in model.risk_worklist
+        if item.facility_id == facility.id and item.medicine_id == medicine.id
+    ]
+    assert len(pair_rows) == 1
+    assert pair_rows[0].risk_level == RiskLevel.MEDIUM
+    assert model.summary.critical_risk_count == 0
+    assert model.summary.medium_risk_count == 1
+    assert model.summary.low_risk_count == 1
+    assert model.summary.active_stockouts == 0
+    fac_a = next(f for f in model.facility_summaries if f.facility_code == "FAC-A")
+    assert fac_a.critical_high_risk_count == 0
