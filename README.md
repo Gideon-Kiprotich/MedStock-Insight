@@ -100,6 +100,18 @@ Redistribution is a deterministic feasibility mechanism, not a network-wide math
 
 The implemented roles are `ADMINISTRATOR`, `SUPPLY_CHAIN_MANAGER`, and `INVENTORY_OFFICER`. The backend enforces role checks on protected routes; selected inventory, consumption, and transfer-completion workflows also scope actions to the assigned facility. Facility-level read isolation is not consistently enforced across all list, dashboard, analytics, forecast, risk, audit, and redistribution surfaces. This is a material security limitation: do not treat this prototype as ready for unrestricted live multi-facility deployment. Consult Section 10 of the [final technical documentation](docs/MEDSTOCK_INSIGHT_MASTER_DOCUMENTATION_FINAL.md) for the detailed permissions matrix and caveats.
 
+| Capability | Administrator | Supply chain manager | Inventory officer |
+|---|:---:|:---:|:---:|
+| Authenticated read routes | Yes | Yes | Yes; facility filtering is inconsistent |
+| Record ordinary inventory movements | Yes | No | Yes, assigned facility only |
+| Generate forecasts and risk assessments | Yes | Yes | No |
+| Generate/review redistribution recommendations | Yes | Yes | No |
+| Create, dispatch, or cancel transfers | Yes | Yes | No |
+| Complete a transfer | Yes | Yes | Yes, only at assigned destination facility |
+| Create facility/medicine records; list demo users | Yes | No | No |
+
+Route-specific authorization remains authoritative; this table is a summary of the implemented backend checks.
+
 ## Transfer lifecycle and audit
 
 Transfers progress through `APPROVED → IN_TRANSIT → COMPLETED`. Dispatch records a source `TRANSFER_OUT`; completion records a destination `TRANSFER_IN`. Completion and inventory movement are handled transactionally by the backend. Cancellation is rejected once a transfer is in transit because stock has already left the source. Audit events identify actors and relevant state changes, but the audit log is not claimed to be tamper-proof.
