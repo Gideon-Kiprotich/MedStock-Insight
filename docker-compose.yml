@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: medstock
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local environment}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:15431:5432"
     volumes:
       - medstock_pgdata:/var/lib/postgresql/data
 
